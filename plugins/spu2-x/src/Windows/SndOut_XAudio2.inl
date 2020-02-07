@@ -446,7 +446,7 @@ public:
 } static XA2;
 
 #if _WIN32_WINNT >= 0x602
-SndOutModule *XAudio2Out = &XA2;
-#else
 SndOutModule *XAudio2_27_Out = &XA2;
+#else
+SndOutModule *XAudio2Out = &XA2;
 #endif
