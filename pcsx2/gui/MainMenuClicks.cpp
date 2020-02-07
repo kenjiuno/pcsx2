@@ -678,10 +678,13 @@ void MainEmuFrame::Menu_Debug_Open_Click(wxCommandEvent &event)
 	DisassemblyDialog* dlg = wxGetApp().GetDisassemblyPtr();
 	if (dlg)
 		dlg->Show();
+}
 
-	W2::ShowR5900();
-	W2::ShowREGs();
-	W2::ShowMEM();
+void MainEmuFrame::Menu_Debug_Open_W2_Click(wxCommandEvent &event)
+{
+    W2::ShowR5900();
+    W2::ShowREGs();
+    W2::ShowMEM();
 }
 
 void MainEmuFrame::Menu_Debug_MemoryDump_Click(wxCommandEvent &event)
