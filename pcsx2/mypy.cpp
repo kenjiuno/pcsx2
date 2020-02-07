@@ -624,13 +624,14 @@ void MypyInit()
 
     s_lastSuspend = true;
 
-    Console.WriteLn(L"(mypy)Import module: %s ", L"__pcsx2__");
+    Console.WriteLn(L"(mypy)Import module: %s ", L"monitor.main");
 
-    PyObject *pyM = PyImport_ImportModule("__pcsx2__");
+    PyObject *pyM = PyImport_ImportModule("monitor.main");
     if (pyM != NULL) {
         Py_CLEAR(pyM);
-    } else
+    } else {
         mypyPrintErr();
+    }
 
     s_pyTState = PyEval_SaveThread();
 }
@@ -805,7 +806,7 @@ void MypyOnSuspend()
 void MypyElfLoaded()
 {
     mypyClearClient();
-    mypyEnsureMod(wxsFormat(L"%08X", ElfCRC));
+    mypyEnsureMod(wxsFormat(L"monitor.%08X", ElfCRC));
 }
 
 void MypyOnResume()
@@ -815,7 +816,7 @@ void MypyOnResume()
     s_lastSuspend = false;
 
     mypyClearClient();
-    mypyEnsureMod(wxsFormat(L"%08X", ElfCRC));
+    mypyEnsureMod(wxsFormat(L"monitor.%08X", ElfCRC));
 
     PyGILState_STATE gstate = PyGILState_Ensure();
 

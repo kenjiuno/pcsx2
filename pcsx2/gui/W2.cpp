@@ -25,7 +25,7 @@ int W2::s_wbrkRes = 0;
 #define IfValidPtr(X) (u32(X) >= 65536U)
 
 enum {
-    wxID_Base = 1001,
+    wxID_Base = 2001,
     wxID_R5900DBG = wxID_Base,
     wxID_REGs,
     wxID_MEM,
@@ -37,7 +37,7 @@ enum {
 };
 
 enum {
-    wxIDC_Base = 1101,
+    wxIDC_Base = 2101,
     wxIDC_ShowREGs = wxIDC_Base,
     wxIDC_ShowMEM,
     wxIDC_Run,
@@ -369,39 +369,18 @@ public:
         int y = 0;
         for (; y < 32; y++) {
             int i = y;
-            dc.DrawText(wxsFormat(_("%-4s 0x%08x_%08x_%08x_%08x")
-				, EEDisarm::eedNameGPR[i]
-				, cpuRegs.GPR.r[i].UL[3]
-				, cpuRegs.GPR.r[i].UL[2]
-				, cpuRegs.GPR.r[i].UL[1]
-				, cpuRegs.GPR.r[i].UL[0]
-			), 2, 2 + cy1 * y);
+            dc.DrawText(wxsFormat(_("%-4s 0x%08x_%08x_%08x_%08x"), EEDisarm::eedNameGPR[i], cpuRegs.GPR.r[i].UL[3], cpuRegs.GPR.r[i].UL[2], cpuRegs.GPR.r[i].UL[1], cpuRegs.GPR.r[i].UL[0]), 2, 2 + cy1 * y);
         }
         {
-            dc.DrawText(wxsFormat(_("%-4s 0x%08x_%08x_%08x_%08x")
-				, L"HI"
-				, cpuRegs.HI.UL[3]
-				, cpuRegs.HI.UL[2]
-				, cpuRegs.HI.UL[1]
-				, cpuRegs.HI.UL[0]
-			), 2, 2 + cy1 * y);
+            dc.DrawText(wxsFormat(_("%-4s 0x%08x_%08x_%08x_%08x"), L"HI", cpuRegs.HI.UL[3], cpuRegs.HI.UL[2], cpuRegs.HI.UL[1], cpuRegs.HI.UL[0]), 2, 2 + cy1 * y);
             y++;
         }
         {
-            dc.DrawText(wxsFormat(_("%-4s 0x%08x_%08x_%08x_%08x")
-				, L"LO"
-				, cpuRegs.LO.UL[3]
-				, cpuRegs.LO.UL[2]
-				, cpuRegs.LO.UL[1]
-				, cpuRegs.LO.UL[0]
-			), 2, 2 + cy1 * y);
+            dc.DrawText(wxsFormat(_("%-4s 0x%08x_%08x_%08x_%08x"), L"LO", cpuRegs.LO.UL[3], cpuRegs.LO.UL[2], cpuRegs.LO.UL[1], cpuRegs.LO.UL[0]), 2, 2 + cy1 * y);
             y++;
         }
         {
-            dc.DrawText(wxsFormat(_("%-4s 0x%08x")
-				, L"pc"
-				, cpuRegs.pc
-			), 2, 2 + cy1 * y);
+            dc.DrawText(wxsFormat(_("%-4s 0x%08x"), L"pc", cpuRegs.pc), 2, 2 + cy1 * y);
         }
     }
 
@@ -469,10 +448,7 @@ public:
         };
         for (; y < 32; y++) {
             int i = y;
-            dc.DrawText(wxsFormat(_("%10s %x")
-				, names[y]
-				, cpuRegs.CP0.r[i]
-			), 2, 2 + cy1 * y);
+            dc.DrawText(wxsFormat(_("%10s %x"), names[y], cpuRegs.CP0.r[i]), 2, 2 + cy1 * y);
         }
     }
 
@@ -513,7 +489,7 @@ public:
             y++;
             dc.DrawText(wxsFormat(_("FCR31 %x"), y, fpuRegs.fprc[31]), 2, 2 + cy1 * y);
             y++;
-            dc.DrawText(wxsFormat(_("Accum %f"), y, fpuRegs.ACC.f), 2, 2 + cy1 * y);
+            dc.DrawText(wxsFormat(_("Accum %f"), fpuRegs.ACC.f), 2, 2 + cy1 * y);
             y++;
         }
     }
@@ -548,13 +524,7 @@ public:
         int y = 0;
         for (; y < 32; y++) {
             int i = y;
-            dc.DrawText(wxsFormat(_("VF%02d  %f_%f_%f_%f")
-				, y
-				, vuRegs[i].VF[y].F[0]
-				, vuRegs[i].VF[y].F[1]
-				, vuRegs[i].VF[y].F[2]
-				, vuRegs[i].VF[y].F[3]
-			), 2, 2 + cy1 * y);
+            dc.DrawText(wxsFormat(_("VF%02d  %f_%f_%f_%f"), y, vuRegs[i].VF[y].F[0], vuRegs[i].VF[y].F[1], vuRegs[i].VF[y].F[2], vuRegs[i].VF[y].F[3]), 2, 2 + cy1 * y);
         }
     }
 
@@ -632,13 +602,7 @@ public:
             u32 code = IfValidPtr(pb) ? *reinterpret_cast<const u32 *>(pb) : 0;
             EEDisarm::EEis eeis;
             EEDisarm::Parse(code, pc, eeis);
-            dc.DrawText(wxsFormat(_("%c%c %08x %08x  %s")
-				, IsBP(pc) ? L'B' : L' '
-				, IsHere(pc) ? L'>' : L' '
-				, pc
-				, code
-				, WX_STR(eeis.ToString())
-			), rc.GetLeft(), rc.GetTop());
+            dc.DrawText(wxsFormat(_("%c%c %08x %08x  %s"), IsBP(pc) ? L'B' : L' ', IsHere(pc) ? L'>' : L' ', pc, code, WX_STR(eeis.ToString())), rc.GetLeft(), rc.GetTop());
             pc += 4;
         }
     }
@@ -1086,26 +1050,32 @@ bool W2::ShowMEM(int f)
 void _UpdateScreens()
 {
     {
-        FwEE *frame = wxStaticCast(wxWindow::FindWindowById(wxID_R5900DBG), FwEE);
-        if (frame != NULL)
-            frame->Upd();
-    }
-    {
-        wxFrame *frame = wxStaticCast(wxWindow::FindWindowById(wxID_REGs), wxFrame);
-        if (frame != NULL) {
-            wxNotebook *tabs = wxStaticCast(wxWindow::FindWindowById(wxID_REGTabs, frame), wxNotebook);
-            if (tabs != NULL)
-                tabs->Update();
+        wxWindow *targetWindow = wxWindow::FindWindowById(wxID_R5900DBG);
+        if (targetWindow != nullptr) {
+            wxStaticCast(targetWindow, FwEE)->Upd();
         }
     }
     {
-        wxFrame *frame = wxStaticCast(wxWindow::FindWindowById(wxID_MEM), wxFrame);
-        if (frame != NULL) {
-            DmEE *vw = wxStaticCast(wxWindow::FindWindowById(wxID_MemPane, frame), DmEE);
-            if (vw != NULL) {
-                Hexe *hexe = wxStaticCast(wxWindow::FindWindowById(wxID_Hexe, vw), Hexe);
-                if (hexe != NULL)
-                    hexe->Refresh();
+        wxWindow *targetWindow = wxWindow::FindWindowById(wxID_REGs);
+        if (targetWindow != nullptr) {
+            wxFrame *frame = wxStaticCast(targetWindow, wxFrame);
+            wxWindow *tabs = wxWindow::FindWindowById(wxID_REGTabs, frame);
+            if (tabs != nullptr) {
+                wxStaticCast(tabs, wxNotebook)->Update();
+            }
+        }
+    }
+    {
+        wxWindow *targetWindow = wxWindow::FindWindowById(wxID_MEM);
+        if (targetWindow != NULL) {
+            wxFrame *frame = wxStaticCast(targetWindow, wxFrame);
+            wxWindow *panel = wxWindow::FindWindowById(wxID_MemPane, frame);
+            if (panel != nullptr) {
+                DmEE *view = wxStaticCast(panel, DmEE);
+                wxWindow *child = wxWindow::FindWindowById(wxID_Hexe, view);
+                if (child != nullptr) {
+                    wxStaticCast(child, Hexe)->Refresh();
+                }
             }
         }
     }
