@@ -35,6 +35,11 @@
 #include "Patch.h"
 #include "GameDatabase.h"
 
+// kkdf2--
+#include "mypy.h"
+#include "W2.h"
+// --kkdf2
+
 #include "../DebugTools/Breakpoints.h"
 #include "R5900OpcodeTables.h"
 
@@ -705,6 +710,11 @@ void __fastcall eeloadHook()
 
 	if (!g_GameStarted && (disctype == 2 || disctype == 1) && elfname == discelf)
 		g_GameLoading = true;
+
+	// kkdf2--
+	MypyElfLoaded();
+	W2::UpdateScreens();
+	// --kkdf2
 }
 
 // Called from recompilers; __fastcall define is mandatory.

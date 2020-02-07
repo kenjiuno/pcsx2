@@ -27,6 +27,12 @@
 
 #include <float.h>
 
+// kkdf2--
+#include "Haxkh2fm.h"
+#include "mypy.h"
+#include "W2.h"
+// --kkdf2
+
 using namespace R5900;		// for OPCODE and OpcodeImpl
 
 extern int vu0branch, vu1branch;
@@ -181,6 +187,78 @@ static void execI()
 	}
 #endif
 
+	// kkdf2--
+	if (ElfCRC == 0xF266B00B) { // kh2fm
+		switch (cpuRegs.pc) {
+			case 0x001adf00: // S_IEXPA
+				Haxkh2fm_trap_S_IEXPA_int();
+				break;
+			case 0x001adf04: // S_IEXPA +4
+				if (g_injectSize != 0) {
+					cpuRegs.pc = 0x001ae004;
+					cpuRegs.GPR.n.v0.UL[0] = g_injectSize;
+					return;
+				}
+				break;
+			case 0x001ae004: // E_IEXPA
+				Haxkh2fm_trap_E_IEXPA();
+				break;
+			case 0x001ae308: // S_FINDX
+				Haxkh2fm_trap_S_FINDX_int();
+				break;
+			case 0x001ae454: // E_FINDX
+				Haxkh2fm_trap_E_FINDX();
+				break;
+		}
+	}
+
+	if (s_mypyHitRMask != 0) {
+		MypyHitRBrk();
+		s_mypyHitRMask = 0;
+	}
+
+	if (s_mypyHitWMask != 0) {
+		MypyHitWBrk();
+		s_mypyHitWMask = 0;
+	}
+
+	s_mypyEat = 0;
+
+	for (int x = 0; x < MAX_BRK && s_mypyBrk[x].pc != 0; x++) {
+		MypyBrk &r = s_mypyBrk[x];
+		if (r.pc == cpuRegs.pc && r.pyCb != NULL) {
+			s_mypyHitBrk = x;
+			s_mypyEat |= MypyHitBrk();
+		}
+	}
+
+	using namespace W2;
+
+	bool fStop = false;
+
+	for (int x = 0; x < MAX_WBRK && (x == 0 || s_wbrk[x].pc != 0); x++) {
+		CWBrk &r = s_wbrk[x];
+		if (r.pc == cpuRegs.pc) {
+			fStop = true;
+		}
+	}
+
+	if (fStop) {
+		s_mypyEat |= W2::WBrkptHit();
+	}
+
+	s_mypy_opc = cpuRegs.pc;
+
+	if (s_mypyEat & 2)
+		return;
+
+	if (s_feet != NULL)
+		if (!MypyWriteEETrace(0)) {
+			fclose(s_feet);
+			s_feet = NULL;
+		}
+
+	// --kkdf2
 
 	cpuBlockCycles += opcode.cycles;
 
