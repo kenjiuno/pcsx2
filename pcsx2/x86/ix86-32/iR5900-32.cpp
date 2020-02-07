@@ -44,6 +44,11 @@
 #include "Utilities/Perf.h"
 
 
+// kkdf2--
+#include "Haxkh2fm.h"
+#include "mypy.h"
+// --kkdf2
+
 using namespace x86Emitter;
 using namespace R5900;
 
@@ -1286,6 +1291,80 @@ void recompileNextInstruction(int delayslot)
 
 	cpuRegs.code = *(int *)s_pCode;
 
+	// kkdf2--
+    bool fEat1 = false;
+    {
+		bool fBranch = false;
+		switch (_Opcode_) {
+			case 1:
+				switch (_Rt_) {
+					case 0:
+					case 1:
+					case 2:
+					case 3:
+					case 0x10:
+					case 0x11:
+					case 0x12:
+					case 0x13:
+						fBranch = true;
+				}
+				break;
+
+			case 2:
+			case 3:
+			case 4:
+			case 5:
+			case 6:
+			case 7:
+			case 0x14:
+			case 0x15:
+			case 0x16:
+			case 0x17:
+				fBranch = true;
+				break;
+		}
+
+		bool fClearEat = false;
+		for (int x = 0; x < MAX_BRK; x++) {
+			if (pc == s_mypyBrk[x].pc) {
+				fClearEat = true;
+				break;
+			}
+		}
+
+		if (fClearEat) {
+			iFlushCall(FLUSH_EVERYTHING);
+			xMOV(ptr32[&cpuRegs.pc], pc);
+			xMOV(ptr32[&s_mypy_pc], pc);
+			if (!fBranch && !delayslot) {
+				xMOV(ptr32[&s_mypyEat], 0);
+			}
+		}
+
+		for (int x = 0; x < MAX_BRK; x++) {
+			if (pc == s_mypyBrk[x].pc) {
+				xMOV(ptr32[&s_mypyHitBrk], (fBranch ? 512 : 0) | 256 | x);
+				xCALL((void *)MypyHitBrk);
+				if (!fBranch && !delayslot) {
+					xOR(ptr32[&s_mypyEat], eax);
+					fEat1 = true;
+				}
+			}
+		}
+
+		if (fEat1) {
+            xTEST(ptr8[&s_mypyEat], 2);
+            j8Ptr[0] = JZ8(0);
+            {
+                xMOV(eax, ptr32[&s_mypy_new_pc]);
+                xMOV(ptr32[&cpuRegs.pc], eax);
+                xJMP((void *)DispatcherEvent);
+            }
+            x86SetJ8(j8Ptr[0]);
+        }
+	}
+	// --kkdf2
+
 	if (!delayslot) {
 		pc += 4;
 		g_cpuFlushedPC = false;
@@ -1369,6 +1448,19 @@ void recompileNextInstruction(int delayslot)
 //	_freeXMMregs();
 //	_flushCachedRegs();
 //	g_cpuHasConstReg = 1;
+
+	// kkdf2--
+	if (fEat1) {
+		xTEST(ptr8[&s_mypyEat], 1);
+		j8Ptr[0] = JZ8(0);
+        {
+			xMOV(ptr32[&cpuRegs.pc], pc); // already +4
+			xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
+            xJMP((void *)DispatcherEvent);
+        }
+		x86SetJ8(j8Ptr[0]);
+	}
+	// --kkdf2
 
 	if (delayslot) {
 		pc += 4;
@@ -1571,7 +1663,7 @@ static void memory_protect_recompiled_code(u32 startpc, u32 size)
 				eeRecPerfLog.Write( "Uncounted Manual block @ 0x%08X : size =%3d page/offs = 0x%05X/0x%03X  inpgsz = %d",
 					startpc, size, inpage_ptr>>12, inpage_ptr&0xfff, inpage_sz );
 			}
-            break;
+			break;
 	}
 }
 

@@ -27,6 +27,11 @@
 
 #include <float.h>
 
+// kkdf2--
+#include "Haxkh2fm.h"
+#include "mypy.h"
+// --kkdf2
+
 using namespace R5900;		// for OPCODE and OpcodeImpl
 
 extern int vu0branch, vu1branch;
@@ -181,6 +186,45 @@ static void execI()
 	}
 #endif
 
+	// kkdf2--
+	{
+		if (s_mypyHitRMask != 0) {
+			MypyHitRBrk();
+			s_mypyHitRMask = 0;
+		}
+
+		if (s_mypyHitWMask != 0) {
+			MypyHitWBrk();
+			s_mypyHitWMask = 0;
+		}
+
+		s_mypyEat = 0;
+
+		s_mypy_pc = pc;
+
+		for (int x = 0; x < MAX_BRK && s_mypyBrk[x].pc != 0; x++) {
+			MypyBrk &r = s_mypyBrk[x];
+			if (r.pc == pc && r.pyCb != NULL) {
+				s_mypyHitBrk = x;
+				s_mypyEat |= MypyHitBrk();
+			}
+		}
+
+		s_mypy_opc = pc;
+
+		if (s_mypyEat & 2) {
+            cpuRegs.pc = s_mypy_new_pc;
+            return;
+        }
+
+		if (s_feet != NULL) {
+			if (!MypyWriteEETrace(0)) {
+				fclose(s_feet);
+				s_feet = NULL;
+			}
+		}
+	}
+	// --kkdf2
 
 	cpuBlockCycles += opcode.cycles;
 

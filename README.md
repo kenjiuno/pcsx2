@@ -1,48 +1,270 @@
-# PCSX2
-[![Travis Build Status](https://travis-ci.org/PCSX2/pcsx2.svg?branch=master)](https://travis-ci.org/PCSX2/pcsx2) [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/b67odm0dd506co78/branch/master?svg=true)](https://ci.appveyor.com/project/gregory38/pcsx2/branch/master) [![Coverity Scan Build Status](https://scan.coverity.com/projects/6310/badge.svg)](https://scan.coverity.com/projects/6310)
+# [PCSX2-py-mon] PCSX2: Execution monitor with Python 3.8
 
-PCSX2 is a free and open-source PlayStation 2 (PS2) emulator. Its purpose is to emulate the PS2's hardware, using a combination of MIPS CPU [Interpreters](https://en.wikipedia.org/wiki/Interpreter_\(computing\)), [Recompilers](https://en.wikipedia.org/wiki/Dynamic_recompilation) and a [Virtual Machine](https://en.wikipedia.org/wiki/Virtual_machine) which manages hardware states and PS2 system memory. This allows you to play PS2 games on your PC, with many additional features and benefits.
+## Overview
 
-# Project Details
+Add debugging support of running game on mainly int (interpreter) mode.
 
-The PCSX2 project has been running for more than ten years. Past versions could only run a few public domain game demos, but newer versions can run most games at full speed, including popular titles such as Final Fantasy X and Devil May Cry 3. Visit the [PCSX2 compatibility list](https://pcsx2.net/compatibility-list.html) to check the latest compatibility status of games (with more than 2500 titles tested), or ask for help in the [official forums](https://forums.pcsx2.net/).
+```
+$ tree /h/Proj/pcsx2/bin
+/h/Proj/pcsx2/bin
+├── monitor
+│   ├── __init__.py
+│   ├── 00000000.py
+│   ├── F266B00B.py
+│   └── main.py
+├── pcsx2.exe
+```
 
-The latest officially released stable version is version 1.6.0.
+`*.py`
 
-Installers and binaries for both Windows and Linux are available from [our website](https://pcsx2.net/download.html).
+```py
+#!pcsx2py
 
-Development builds are also available from [our website](https://pcsx2.net/download/development.html).
+# This volatile module `monitor.F266B00B` may be re-loaded and loose all variables on some events:
+# - Game startup (on _reloadElfInfo)
+# - Resume, where it is suspended by pressing ESC key (on AppCoreThread::Resume)
+# Not:
+# - Resume, where it is suspended by System menu → Pause
+# - Load game state
 
-# System Requirements
+import pcsx2
 
-#### Minimum
+pcsx2.WriteLn('Hello')
 
-| Operating System | CPU | GPU | RAM |
-| --- | --- | --- | --- |
-| - Windows 7 or newer (32 or 64 bit) <br/> - Ubuntu 18.04/Debian or newer, Arch Linux, or other distro (32 or 64 bit) | - Supports SSE2 <br/> - [PassMark Single Thread Performance](https://www.cpubenchmark.net/singleThread.html) rating near or greater than 1600 <br/> - Two physical cores, with hyperthreading | - Direct3D10 support <br/> - OpenGL 3.x support <br/> - [PassMark G3D Mark](https://www.videocardbenchmark.net/high_end_gpus.html) rating around 3000 (GeForce GTX 750) <br/> - 2 GB Video Memory | 4 GB |
+```
 
-*Note: Recommended Single Thread Performance is based on moderately complex games. Games that pushed the PS2 hardware to its limits will struggle on CPUs at this level. Some release titles and 2D games which underutilized the PS2 hardware may run on CPUs rated as low as 1200. A quick reference for CPU **intensive games**: [Wiki](https://wiki.pcsx2.net/Category:CPU_intensive_games), [Forum](https://forums.pcsx2.net/Thread-LIST-The-Most-CPU-Intensive-Games) and CPU **light** games: [Forum](https://forums.pcsx2.net/Thread-LIST-Games-that-don-t-need-a-strong-CPU-to-emulate)*
+## Embedded functions
 
-#### Recommended 
+### pcsx2.ClearClient
 
-| Operating System | CPU | GPU | RAM |
-| --- | --- | --- | --- |
-| - Windows 10 (64 bit) <br/> - Ubuntu 19.04/Debian or newer, Arch Linux, or other distro (64 bit) | - Supports AVX2 <br/> - [PassMark Single Thread Performance](https://www.cpubenchmark.net/singleThread.html) rating near or greater than 2100 <br/> - Four physical cores, with or without hyperthreading | - Direct3D11 support <br/> - OpenGL 4.5 support <br/> - [PassMark G3D Mark](https://www.videocardbenchmark.net/high_end_gpus.html) rating around 6000 (GeForce GTX 1050 Ti) <br/> - 4 GB Video Memory | 8 GB |
+```py
+pcsx2.ClearClient
+```
 
-*Note: Recommended GPU is based on 3x Internal, ~1080p resolution requirements. Higher resolutions will require stronger cards; 6x Internal, ~4K resolution will require a [PassMark G3D Mark](https://www.videocardbenchmark.net/high_end_gpus.html) rating around 12000 (GeForce GTX 1070 Ti). Just like CPU requirements, this is also highly game dependent. A quick reference for GPU **intensive games**:  [Wiki](https://wiki.pcsx2.net/Category:GPU_intensive_games)*
+Clear break points.
 
-## Technical Notes
+### pcsx2.WriteLn
 
-- You need the [Visual C++ 2019 x86 Redistributables](https://support.microsoft.com/en-us/help/2977003/) to run PCSX2.
-- Windows XP and DirectX 9 support was dropped after stable release 1.4.0
-- Windows 7 support will be dropped after stable release 1.6.0
-- Make sure to update your operating system, drivers, and DirectX (if applicable) to ensure you have the best experience possible. Having a newer GPU is also recommended so you have the latest supported drivers.
-- Because of copyright issues, and the complexity of trying to work around it, you need a BIOS dump extracted from a legitimately-owned PS2 console to use the emulator. For more information about the BIOS and how to get it from your console, visit [this page](https://pcsx2.net/config-guide/official-english-pcsx2-configuration-guide.html#Bios).
-- PCSX2 uses two CPU cores for emulation by default. A third core can be used via the MTVU speed hack, which is compatible with most games. This can be a significant speedup on CPUs with 3+ cores, but it may be a slowdown on GS-limited games (or on CPUs with fewer than 2 cores). Software renderers will then additionally use however many rendering threads it is set to and will need higher core counts to run efficiently.
-- Requirements benchmarks are based on a statistic from the Passmark CPU bench marking software. When we say "STR", we are referring to Passmark's "Single Thread Rating" statistic. You can look up your CPU on [Passmark's website for CPUs](https://cpubenchmark.net) to see how it compares to PCSX2's requirements.
+```py
+pcsx2.WriteLn("")
+```
 
-# Screenshots
+`Console.WriteLn(L"%s", pzwOutput);`
 
-![Okami](https://pcsx2.net/images/stories/gitsnaps/okami_n1s.jpg "Okami")       ![Final Fantasy XII](https://pcsx2.net/images/stories/gitsnaps/finalfantasy12izjs_s2.jpg "Final Fantasy XII")       ![Shadow of the Colossus](https://pcsx2.net/images/stories/gitsnaps/sotc6s2.jpg "Shadow of the Colossus")       ![DragonBall Z Budokai Tenkaichi 3](https://pcsx2.net/images/stories/gitsnaps/DBZ-BT-3s.jpg "DragonBall Z Budokai Tenkaichi 3")     ![Kingdom Hearts 2: Final Mix](https://pcsx2.net/images/stories/gitsnaps/kh2_fm_n1s2.jpg "Kingdom Hearts 2: Final Mix")     ![God of War 2](https://pcsx2.net/images/stories/gitsnaps/gow2_s2.jpg "God of War 2")       ![Metal Gear Solid 3: Snake Eater](https://pcsx2.net/images/stories/gitsnaps/mgs3-1_s2.jpg "Metal Gear Solid 3: Snake Eater")       ![Rogue Galaxy](https://pcsx2.net/images/stories/gitsnaps/rogue_galaxy_n1s2.jpg "Rogue Galaxy")
+Write line to pcsx2 debug window.
 
-Want more? [Check out the PCSX2 website](https://pcsx2.net/demo-videos-screenshots/screenshots.html).
+### pcsx2.AddBrk
+
+```py
+pcsx2.AddBrk(addr, callable)
+```
+
+```py
+def bp(addr):
+	def setbp(funct):
+		print('Add bp: {0:x}'.format(addr))
+		pcsx2.AddBrk(addr, funct)
+	return setbp
+
+@bp(0x002fdfc8)
+def S_ASSERT():
+	print("ASSERT!")
+	print(read0Str(pcsx2.GetUL0('a0')))
+```
+
+Add breakpoint (max 32)
+
+### pcsx2.GetUL0
+
+```py
+pcsx2.GetUL0(regName)
+```
+
+```py
+pcsx2.GetUL0('ra')
+```
+
+Get lower 32 bits of given register name.
+
+### pcsx2.SetUL0
+
+```py
+pcsx2.SetUL0(regName, long)
+```
+
+```py
+pcsx2.SetUL0("a0", 0)
+```
+
+Update only lower 32 bits of given register name.
+
+### pcsx2.SetPC
+
+```py
+pcsx2.SetPC(long)
+```
+
+```py
+pcsx2.SetPC(0x001ae004)
+```
+
+Set new `pc` (program counter), and refresh recompiler.
+
+### pcsx2.ReadMem
+
+```py
+pcsx2.ReadMem(start, length)
+```
+
+```py
+mem = pcsx2.ReadMem(0, 32*1024*1024)
+```
+
+Read EE memory.
+
+### pcsx2.ReadUI16
+
+```py
+long = pcsx2.ReadUI16(addr)
+```
+
+```cpp
+    u16 *pRd = (u16 *)PSM(off);
+    return PyLong_FromLong(*pRd);
+```
+
+Read 2 bytes from EE memory.
+
+### pcsx2.ReadUI32
+
+```cpp
+    u32 *pRd = (u32 *)PSM(off);
+    return PyLong_FromLong(*pRd);
+```
+
+### pcsx2.ReadI16
+
+```cpp
+    s16 *pRd = (s16 *)PSM(off);
+    return PyLong_FromLong(*pRd);
+```
+
+### pcsx2.ReadI32
+
+```cpp
+    s32 *pRd = (s32 *)PSM(off);
+    return PyLong_FromLong(*pRd);
+```
+
+### pcsx2.ReadByte
+
+```cpp
+    u8 *pRd = (u8 *)PSM(off);
+    return PyLong_FromLong(*pRd);
+```
+
+### pcsx2.WriteMem
+
+```py
+pcsx2.WriteMem(PyBytes, startIndex, addr, len)
+```
+
+Write bytes to EE memory.
+
+### pcsx2.WriteByte
+
+```py
+pcsx2.WriteByte(addr, value)
+```
+
+```cpp
+    memWrite8(off, val);
+```
+
+Write a byte to EE memory.
+
+### pcsx2.WriteUI16
+
+```cpp
+    memWrite16(off, val);
+```
+
+### pcsx2.WriteUI32
+
+```cpp
+    memWrite32(off, val);
+```
+
+### pcsx2.AddRBrk
+
+```py
+index = pcsx2.AddRBrk(addr, length, callable)
+```
+
+Set memory read break point. Max 32 read break points.
+
+### pcsx2.DelRBrk
+
+```py
+pcsx2.DelRBrk(index)
+```
+
+### pcsx2.AddWBrk
+
+```py
+index = pcsx2.AddWBrk(addr, length, callable)
+```
+
+Set memory write break point. Max 32 write break points.
+
+### pcsx2.DelWBrk
+
+```py
+pcsx2.DelWBrk(index)
+```
+
+### pcsx2.pc
+
+Return current `pc` (program counter).
+
+### pcsx2.opc
+
+Return old (previous) `pc` (program counter) only for int mode.
+
+### pcsx2.isRec
+
+- True if rec mode.
+- False if int mode.
+
+### pcsx2.ElfCRC
+
+Return Game CRC in long value.
+
+### pcsx2.Error
+
+`Console.Error(L"%s", pzwOutput);`
+
+### pcsx2.Warning
+
+`Console.Warning(L"%s", pzwOutput);`
+
+### pcsx2.OnSuspend
+
+```py
+@pcsx2.OnSuspend
+def onSuspend():
+	dump()
+	print('Suspend')
+```
+
+### pcsx2.OnResume
+
+```py
+@pcsx2.OnResume
+def onResume():
+	print('Resume')
+```
+
+### pcsx2.StartEETrace
+
+### pcsx2.EndEETrace

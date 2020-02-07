@@ -241,7 +241,7 @@ void MainEmuFrame::ConnectMenus()
 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_ChangeLang, this, MenuId_ChangeLang);
 
 	// Debug
-	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Open_Click, this, MenuId_Debug_Open);
+    Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Open_Click, this, MenuId_Debug_Open);
 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Logging_Click, this, MenuId_Debug_Logging);
 
 	// Capture
@@ -257,8 +257,6 @@ void MainEmuFrame::ConnectMenus()
 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Recording_VirtualPad_Open_Click, this, MenuId_Recording_VirtualPad_Port0);
 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Recording_VirtualPad_Open_Click, this, MenuId_Recording_VirtualPad_Port1);
 #endif
-
-	//Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_MemoryDump_Click, this, MenuId_Debug_MemoryDump);
 }
 
 void MainEmuFrame::InitLogBoxPosition( AppConfig::ConsoleLogOptions& conf )
@@ -388,15 +386,15 @@ MainEmuFrame::MainEmuFrame(wxWindow* parent, const wxString& title)
 	if( PCSX2_isReleaseVersion )
 	{
 		// stable releases, with a simple title.
-		wintitle.Printf( L"%s  %d.%d.%d", pxGetAppName().c_str(), PCSX2_VersionHi, PCSX2_VersionMid, PCSX2_VersionLo );
+		wintitle.Printf( L"%s-py-mon  %d.%d.%d", pxGetAppName().c_str(), PCSX2_VersionHi, PCSX2_VersionMid, PCSX2_VersionLo );
 	}
 	else
 	{
 		// beta / development editions, which feature revision number and compile date.
 		if (strlen(GIT_REV) > 5) {
-			wintitle.Printf( L"%s %s", pxGetAppName().c_str(), GIT_REV);
+			wintitle.Printf( L"%s-py-mon %s", pxGetAppName().c_str(), GIT_REV);
 		} else {
-			wintitle.Printf( L"%s  %d.%d.%d-%lld%s (git)", pxGetAppName().c_str(), PCSX2_VersionHi, PCSX2_VersionMid,
+			wintitle.Printf( L"%s-py-mon  %d.%d.%d-%lld%s (git)", pxGetAppName().c_str(), PCSX2_VersionHi, PCSX2_VersionMid,
 					PCSX2_VersionLo, SVN_REV, SVN_MODS ? L"m" : wxEmptyString );
 		}
 	}
