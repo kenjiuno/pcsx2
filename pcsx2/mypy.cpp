@@ -698,7 +698,7 @@ void mypyEnsureMod(wxString fp)
 {
     PyGILState_STATE gstate = PyGILState_Ensure();
 
-    Console.WriteLn(L"(mypy)Ensure module: %s ", fp.c_str());
+    Console.WriteLn(L"(mypy)Ensure module: %s ", WX_STR(fp));
     PyObject *pyD = PyImport_GetModuleDict();
     if (pyD != NULL) {
         wxASSERT(PyDict_CheckExact(pyD));
