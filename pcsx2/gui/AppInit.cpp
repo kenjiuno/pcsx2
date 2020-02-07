@@ -35,6 +35,10 @@
 #include <wx/stdpaths.h>
 #include <memory>
 
+// kkdf2--
+#include "mypy.h"
+// --kkdf2
+
 using namespace pxSizerFlags;
 
 void Pcsx2App::DetectCpuAndUserMode()
@@ -514,6 +518,10 @@ bool Pcsx2App::OnInit()
 		AllocateCoreStuffs();
 		if( m_UseGUI ) OpenMainFrame();
 
+		// kkdf2--
+		MypyInit();
+		// --kkdf2
+
 
 		(new GameDatabaseLoaderThread())->Start();
 
@@ -670,6 +678,10 @@ void Pcsx2App::CleanupOnExit()
 
 	pxDoAssert = pxAssertImpl_LogIt;
 	Console_SetActiveHandler( ConsoleWriter_Stdout );
+
+	// kkdf2--
+	MypyFinalize();
+	// --kdf2
 }
 
 void Pcsx2App::CleanupResources()

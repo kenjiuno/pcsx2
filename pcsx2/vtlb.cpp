@@ -38,6 +38,10 @@
 
 #include "Utilities/MemsetFast.inl"
 
+// kkdf2--
+#include "mypy.h"
+// --kkdf2
+
 using namespace R5900;
 using namespace vtlb_private;
 
@@ -99,7 +103,16 @@ DataType __fastcall vtlb_memRead(u32 addr)
 	uptr vmv=vtlbdata.vmap[addr>>VTLB_PAGE_BITS];
 	sptr ppf=addr+vmv;
 
-	if (!(ppf<0))
+	// kkdf2--
+	for (int i = 0; i < MAX_BRK; i++) {
+		if (s_mypyRBrk[i].Test(addr)) {
+			s_mypyHitRMask |= 1ULL << i;
+			break;
+		}
+	}
+	// --kkdf2
+
+    if (!(ppf < 0))
 	{
 		if (!CHECK_EEREC) 
 		{
@@ -154,6 +167,15 @@ void __fastcall vtlb_memRead64(u32 mem, mem64_t *out)
 	uptr vmv=vtlbdata.vmap[mem>>VTLB_PAGE_BITS];
 	sptr ppf=mem+vmv;
 
+	// kkdf2--
+	for (int i = 0; i < MAX_BRK; i++) {
+		if (s_mypyRBrk[i].Test(mem)) {
+			s_mypyHitRMask |= 1ULL << i;
+			break;
+		}
+	}
+	// --kkdf2
+
 	if (!(ppf<0))
 	{
 		if (!CHECK_EEREC) {
@@ -180,6 +202,15 @@ void __fastcall vtlb_memRead128(u32 mem, mem128_t *out)
 {
 	uptr vmv=vtlbdata.vmap[mem>>VTLB_PAGE_BITS];
 	sptr ppf=mem+vmv;
+
+	// kkdf2--
+	for (int i = 0; i < MAX_BRK; i++) {
+		if (s_mypyRBrk[i].Test(mem)) {
+			s_mypyHitRMask |= 1ULL << i;
+			break;
+		}
+	}
+	// --kkdf2
 
 	if (!(ppf<0))
 	{
@@ -213,6 +244,16 @@ void __fastcall vtlb_memWrite(u32 addr, DataType data)
 
 	uptr vmv=vtlbdata.vmap[addr>>VTLB_PAGE_BITS];
 	sptr ppf=addr+vmv;
+
+	// kkdf2--
+	for (int i = 0; i < MAX_BRK; i++) {
+		if (s_mypyWBrk[i].Test(addr)) {
+			s_mypyHitWMask |= 1ULL << i;
+			break;
+		}
+	}
+	// --kkdf2
+
 	if (!(ppf<0))
 	{		
 		if (!CHECK_EEREC) 
@@ -261,6 +302,16 @@ void __fastcall vtlb_memWrite64(u32 mem, const mem64_t* value)
 {
 	uptr vmv=vtlbdata.vmap[mem>>VTLB_PAGE_BITS];
 	sptr ppf=mem+vmv;
+
+	// kkdf2--
+	for (int i = 0; i < MAX_BRK; i++) {
+		if (s_mypyWBrk[i].Test(mem)) {
+			s_mypyHitWMask |= 1ULL << i;
+			break;
+		}
+	}
+	// --kkdf2
+
 	if (!(ppf<0))
 	{		
 		if (!CHECK_EEREC) 
@@ -289,6 +340,16 @@ void __fastcall vtlb_memWrite128(u32 mem, const mem128_t *value)
 {
 	uptr vmv=vtlbdata.vmap[mem>>VTLB_PAGE_BITS];
 	sptr ppf=mem+vmv;
+
+	// kkdf2--
+	for (int i = 0; i < MAX_BRK; i++) {
+		if (s_mypyWBrk[i].Test(mem)) {
+			s_mypyHitWMask |= 1ULL << i;
+			break;
+		}
+	}
+	// --kkdf2
+
 	if (!(ppf<0))
 	{
 		if (!CHECK_EEREC) 

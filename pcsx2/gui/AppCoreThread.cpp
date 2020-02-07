@@ -33,6 +33,11 @@
 #include "R5900Exceptions.h"
 #include "Sio.h"
 
+// kkdf2--
+#include "mypy.h"
+#include "W2.h"
+// --kkdf2
+
 __aligned16 SysMtgsThread mtgsThread;
 __aligned16 AppCoreThread CoreThread;
 
@@ -135,7 +140,12 @@ ExecutorThread& GetSysExecutorThread()
 
 static void _Suspend()
 {
-	GetCoreThread().Suspend(true);
+	// kkdf2--
+	MypyOnSuspend();
+	W2::UpdateScreens();
+	// --kkdf2
+
+    GetCoreThread().Suspend(true);
 }
 
 void AppCoreThread::Suspend( bool isBlocking )
@@ -159,6 +169,11 @@ void AppCoreThread::Resume()
 		GetSysExecutorThread().PostEvent( SysExecEvent_InvokeCoreThreadMethod(&AppCoreThread::Resume) );
 		return;
 	}
+
+	// kkdf2--
+	MypyOnResume();
+	W2::UpdateScreens();
+	// --kkdf2
 
 	GetCorePlugins().Init();
 	_parent::Resume();
@@ -206,6 +221,10 @@ void AppCoreThread::OnResumeReady()
 
 	sApp.PostAppMethod( &Pcsx2App::leaveDebugMode );
 	_parent::OnResumeReady();
+
+	// kkdf2--
+	W2::UpdateScreens();
+	// --kkdf2
 }
 
 void AppCoreThread::OnPause()
