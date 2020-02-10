@@ -176,7 +176,7 @@ enum MenuIdentifiers
 
 	// Debug Subsection
 	MenuId_Debug_Open,			// opens the debugger window / starts a debug session
-	MenuId_Debug_Open_W2,		// opens the debugger window / starts a debug session
+	MenuId_Debug_Open_PyMon,	// opens the debugger window / starts a debug session
 	MenuId_Debug_MemoryDump,
 	MenuId_Debug_Logging,		// dialog for selection additional log options
 	MenuId_Debug_CreateBlockdump,

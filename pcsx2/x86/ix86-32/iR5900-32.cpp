@@ -1297,30 +1297,30 @@ void recompileNextInstruction(int delayslot)
 		switch (pc) {
 			case 0x001adf00: // S_IEXPA
 				_freeX86regs();
-                xCALL((void *)Haxkh2fm_trap_S_IEXPA_rec);
+				xCALL((void *)Haxkh2fm_trap_S_IEXPA_rec);
 				break;
 
 			case 0x001adf04: // S_IEXPA +4
 				iFlushCall(FLUSH_EVERYTHING);
-                xMOV(eax, (int)(uptr)&g_injectSize);
-                xCMP(eax, 0);
+				xMOV(eax, ptr32[&g_injectSize]);
+				xCMP(eax, 0);
 				j8Ptr[0] = JE8(0);
 				xMOV(ptr32[&cpuRegs.pc], 0x001ae004);
 				xMOV(ptr32[&cpuRegs.GPR.n.v0.UL[0]], eax);
-				xMOV(ptr32[&cpuRegs.cycle], scaleblockcycles());
-                xJMP((void *)DispatcherEvent);
+				xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
+				xJMP((void *)DispatcherEvent);
 				x86SetJ8(j8Ptr[0]);
 				break;
 
 			case 0x001ae004: // E_IEXPA
 				_freeX86regs();
 				//_deleteGPRtoXMMreg(2, 1); // 2 -> v0REG
-                xCALL((void *)Haxkh2fm_trap_E_IEXPA);
+				xCALL((void *)Haxkh2fm_trap_E_IEXPA);
 				break;
 
 			case 0x001ae308: // S_FINDX
 				_freeX86regs();
-                xCALL((void *)Haxkh2fm_trap_S_FINDX_rec);
+				xCALL((void *)Haxkh2fm_trap_S_FINDX_rec);
 				break;
 
 			case 0x001ae454: // E_FINDX
@@ -1717,7 +1717,7 @@ static void memory_protect_recompiled_code(u32 startpc, u32 size)
 				eeRecPerfLog.Write( "Uncounted Manual block @ 0x%08X : size =%3d page/offs = 0x%05X/0x%03X  inpgsz = %d",
 					startpc, size, inpage_ptr>>12, inpage_ptr&0xfff, inpage_sz );
 			}
-            break;
+			break;
 	}
 }
 
