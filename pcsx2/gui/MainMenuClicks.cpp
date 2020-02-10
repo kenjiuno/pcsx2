@@ -680,7 +680,7 @@ void MainEmuFrame::Menu_Debug_Open_Click(wxCommandEvent &event)
 		dlg->Show();
 }
 
-void MainEmuFrame::Menu_Debug_Open_W2_Click(wxCommandEvent &event)
+void MainEmuFrame::Menu_Debug_Open_PyMon_Click(wxCommandEvent &event)
 {
     W2::ShowR5900();
     W2::ShowREGs();

@@ -242,7 +242,7 @@ void MainEmuFrame::ConnectMenus()
 
 	// Debug
     Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Open_Click, this, MenuId_Debug_Open);
-    Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Open_W2_Click, this, MenuId_Debug_Open_W2);
+    Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Open_PyMon_Click, this, MenuId_Debug_Open_PyMon);
 	Bind(wxEVT_MENU, &MainEmuFrame::Menu_Debug_Logging_Click, this, MenuId_Debug_Logging);
 
 	// Capture
@@ -550,7 +550,7 @@ MainEmuFrame::MainEmuFrame(wxWindow* parent, const wxString& title)
 	m_menuMisc.Append( MenuId_ChangeLang,		L"Change &Language" ); // Always in English
 
 	m_menuDebug.Append(MenuId_Debug_Open,		_("&Open Debug Window..."),	wxEmptyString);
-	m_menuDebug.Append(MenuId_Debug_Open_W2,	_("&Open Debug Window (PyMon related)..."),	wxEmptyString);
+	m_menuDebug.Append(MenuId_Debug_Open_PyMon,	_("&Open Debug Window (PyMon version)..."),	wxEmptyString);
 
 #ifdef PCSX2_DEVBUILD
 	m_menuDebug.Append(MenuId_Debug_Logging,	_("&Logging..."),			wxEmptyString);
