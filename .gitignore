@@ -110,5 +110,12 @@ oprofile_data/
 /tools/GSDumpGUI/obj
 .vs
 
+/bin/monitor
+/bin/run.bat
+/bin/pyPath.bat
+/bin/inject.*
+/bin/expa.*
+/pcsx2-*.7z
+
 /pcsx2/windows/VCprojects/GSdx_opengl_debug_hw.txt
 /pcsx2/windows/VCprojects/GSdx_opengl_debug_sw.txt
