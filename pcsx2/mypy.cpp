@@ -24,7 +24,8 @@ u32 s_mypyEat = 0;
 u64 s_mypyHitRMask = 0;
 u64 s_mypyHitWMask = 0;
 
-bool s_newbp = false;
+bool s_newbp = false; // A break point have updated. The recompiler needs refresh.
+bool s_newpc = false; // PC updated. The recompiler needs refresh.
 
 FILE *s_feet = NULL;
 u32 s_tracpos = 0;
@@ -354,6 +355,17 @@ static PyObject *pcsx2_SetUL0(PyObject *self, PyObject *args)
     return PyErr_SetString(PyExc_TypeError, "Pass an int, or a str."), NULL;
 }
 
+static PyObject *pcsx2_SetPC(PyObject *self, PyObject *args)
+{
+    uint newPC = 0;
+    if (!PyArg_ParseTuple(args, "I:pcsx2_SetPC", &newPC))
+        return NULL;
+
+	s_newpc = true;
+    s_mypy_new_pc = newPC;
+    Py_RETURN_NONE;
+}
+
 static PyObject *pcsx2_ReadUI16(PyObject *self, PyObject *args)
 {
     uint off = 0;
@@ -434,7 +446,14 @@ static PyObject *pcsx2_WriteByte(PyObject *self, PyObject *args)
     Py_RETURN_NONE;
 }
 
+u32 s_mypy_pc = 0;
 u32 s_mypy_opc = 0;
+u32 s_mypy_new_pc = 0;
+
+static PyObject *pcsx2_pc(PyObject *self)
+{
+    return PyLong_FromLong(s_mypy_pc);
+}
 
 static PyObject *pcsx2_opc(PyObject *self)
 {
@@ -492,6 +511,13 @@ static PyObject *pcsx2_isRec(PyObject *self)
     Py_RETURN_FALSE;
 }
 
+static PyObject *pcsx2_ElfCRC(PyObject *self)
+{
+    extern u32 ElfCRC;
+
+    return PyLong_FromUnsignedLong(ElfCRC);
+}
+
 static PyObject *pcsx2_StartEETrace(PyObject *self, PyObject *args)
 {
     Py_UNICODE *pzwOutput = NULL;
@@ -536,6 +562,7 @@ static PyMethodDef pcsx2_methods[] = {
     {"AddBrk", pcsx2_AddBrk, METH_VARARGS},
     {"GetUL0", pcsx2_GetUL0, METH_VARARGS},
     {"SetUL0", pcsx2_SetUL0, METH_VARARGS},
+    {"SetPC", pcsx2_SetPC, METH_VARARGS},
     {"ReadMem", pcsx2_ReadMem, METH_VARARGS},
     {"ReadUI16", pcsx2_ReadUI16, METH_VARARGS},
     {"ReadUI32", pcsx2_ReadUI32, METH_VARARGS},
@@ -550,8 +577,10 @@ static PyMethodDef pcsx2_methods[] = {
     {"DelRBrk", pcsx2_DelRBrk, METH_VARARGS},
     {"AddWBrk", pcsx2_AddWBrk, METH_VARARGS},
     {"DelWBrk", pcsx2_DelWBrk, METH_VARARGS},
+    {"pc", (PyCFunction)pcsx2_pc, METH_NOARGS},
     {"opc", (PyCFunction)pcsx2_opc, METH_NOARGS},
     {"isRec", (PyCFunction)pcsx2_isRec, METH_NOARGS},
+    {"ElfCRC", (PyCFunction)pcsx2_ElfCRC, METH_NOARGS},
     //	{"AddMBrk", pcsx2_AddMBrk, METH_VARARGS},
     //	{"DelMBrk", pcsx2_DelMBrk, METH_VARARGS},
     {"Error", pcsx2_Error, METH_VARARGS},
@@ -651,48 +680,6 @@ void MypyFinalize()
     Py_Finalize();
     Console.WriteLn(L"Python finalized.");
 }
-
-#if 0
-void mypyLoadMod(wxString fp) {
-    PyGILState_STATE gstate = PyGILState_Ensure();
-
-    Console.WriteLn( L"(mypy)Import module: %s " , fp.c_str() );
-    PyObject *py = PyImport_ImportModule(fp.mb_str());
-    if (py != NULL) {
-        Py_CLEAR(py);
-    }
-    else {
-        mypyPrintErr();
-        PyErr_Clear();
-    }
-
-    PyGILState_Release(gstate);
-}
-
-void mypyReloadMod(wxString fp) {
-    PyGILState_STATE gstate = PyGILState_Ensure();
-
-    Console.WriteLn( L"(mypy)Reload module: %s ", fp.c_str() );
-    PyObject *py = PyImport_ImportModule(fp.mb_str());
-    if (py != NULL) {
-        PyObject *pyNew = PyImport_ReloadModule(py);
-        if (py != NULL) {
-            Py_CLEAR(pyNew);
-        }
-        else {
-            mypyPrintErr();
-            PyErr_Clear();
-        }
-        Py_CLEAR(py);
-    }
-    else {
-        mypyPrintErr();
-        PyErr_Clear();
-    }
-
-    PyGILState_Release(gstate);
-}
-#endif
 
 void mypyEnsureMod(wxString fp)
 {
@@ -840,6 +827,7 @@ int MypyHitBrk()
 {
     {
         s_newbp = false;
+        s_newpc = false;
 
         int index = s_mypyHitBrk & 255;
         PyObject *pyfn = s_mypyBrk[index].pyCb;
@@ -858,8 +846,9 @@ int MypyHitBrk()
 
         PyGILState_Release(gstate);
 
-        if (s_newbp)
-            return 1;
+        if (s_newbp || s_newpc) {
+            return (s_newbp ? 1 : 0) | (s_newpc ? 2 : 0);
+        }
     }
 
     return 0;

@@ -37,20 +37,22 @@ struct MypyBrk
 
 #define MAX_BRK 32
 
-extern MypyBrk s_mypyBrk[MAX_BRK];
-extern MypyBrk s_mypyRBrk[MAX_BRK]; // readmem
-extern MypyBrk s_mypyWBrk[MAX_BRK]; // writemem
+extern MypyBrk s_mypyBrk[MAX_BRK];  // pc (program counter) break points.
+extern MypyBrk s_mypyRBrk[MAX_BRK]; // read mem break points.
+extern MypyBrk s_mypyWBrk[MAX_BRK]; // write mem break points.
 
 extern int MypyHitBrk(); // 1=new bp appended (need calling Cpu->Clear).
 extern u32 s_mypyHitBrk; // 256=inside-recomp, 512=possible-branch
-extern u32 s_mypyEat;    // 1=recompile-then, 2=run-here-again
+extern u32 s_mypyEat;    // 1=recompile-after-running-current-instruction, 2=set-new-pc-before-running-current-instruction
 
 extern int MypyHitRBrk();
-extern u64 s_mypyHitRMask;
-extern u32 s_mypy_opc;
+extern u64 s_mypyHitRMask; // Notice hit on vtlb_memRead, vtlb_memRead64, or vtlb_memRead128.
+extern u32 s_mypy_opc;     // Old pc (program counter) for int mode.
+extern u32 s_mypy_pc;      // Current pc
+extern u32 s_mypy_new_pc;  // New pc set from user py
 
 extern int MypyHitWBrk();
-extern u64 s_mypyHitWMask;
+extern u64 s_mypyHitWMask; // Notice hit on vtlb_memWrite, vtlb_memWrite64, or vtlb_memWrite128.
 
 extern bool MypyWriteEETrace(int mask);
 extern FILE *s_feet;

@@ -10,7 +10,6 @@ $ tree /h/Proj/pcsx2/bin
 ├── monitor
 │   ├── __init__.py
 │   ├── 00000000.py
-│   ├── 93F8A60B.py
 │   ├── F266B00B.py
 │   └── main.py
 ├── pcsx2.exe
@@ -20,6 +19,18 @@ $ tree /h/Proj/pcsx2/bin
 
 ```py
 #!pcsx2py
+
+# This volatile module `monitor.F266B00B` may be re-loaded and loose all variables on some events:
+# - Game startup (on _reloadElfInfo)
+# - Resume, where it is suspended by pressing ESC key (on AppCoreThread::Resume)
+# Not:
+# - Resume, where it is suspended by System menu → Pause
+# - Load game state
+
+import pcsx2
+
+pcsx2.WriteLn('Hello')
+
 ```
 
 ## Embedded functions
@@ -86,6 +97,18 @@ pcsx2.SetUL0("a0", 0)
 ```
 
 Update only lower 32 bits of given register name.
+
+### pcsx2.SetPC
+
+```py
+pcsx2.SetPC(long)
+```
+
+```py
+pcsx2.SetPC(0x001ae004)
+```
+
+Set new `pc` (program counter), and refresh recompiler.
 
 ### pcsx2.ReadMem
 
@@ -200,14 +223,22 @@ Set memory write break point. Max 32 write break points.
 pcsx2.DelWBrk(index)
 ```
 
+### pcsx2.pc
+
+Return current `pc` (program counter).
+
 ### pcsx2.opc
 
-Return current `pc` (program counter) only for int mode.
+Return old (previous) `pc` (program counter) only for int mode.
 
 ### pcsx2.isRec
 
 - True if rec mode.
 - False if int mode.
+
+### pcsx2.ElfCRC
+
+Return Game CRC in long value.
 
 ### pcsx2.Error
 

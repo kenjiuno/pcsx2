@@ -892,9 +892,6 @@
     <ClCompile Include="..\..\Recording\VirtualPad.cpp">
       <Filter>Recording\gui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\gui\W2.cpp">
-      <Filter>PyMon</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\Haxkh2fm.cpp">
       <Filter>PyMon</Filter>
     </ClCompile>
@@ -1369,9 +1366,6 @@
       <Filter>PyMon</Filter>
     </ClInclude>
     <ClInclude Include="..\..\EEDisarm.h">
-      <Filter>PyMon</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\gui\W2.h">
       <Filter>PyMon</Filter>
     </ClInclude>
     <ClInclude Include="..\..\mypy.h">

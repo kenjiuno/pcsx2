@@ -35,7 +35,6 @@
 
 // kkdf2--
 #include "mypy.h"
-#include "W2.h"
 // --kkdf2
 
 __aligned16 SysMtgsThread mtgsThread;
@@ -142,7 +141,6 @@ static void _Suspend()
 {
 	// kkdf2--
 	MypyOnSuspend();
-	W2::UpdateScreens();
 	// --kkdf2
 
     GetCoreThread().Suspend(true);
@@ -172,7 +170,6 @@ void AppCoreThread::Resume()
 
 	// kkdf2--
 	MypyOnResume();
-	W2::UpdateScreens();
 	// --kkdf2
 
 	GetCorePlugins().Init();
@@ -221,10 +218,6 @@ void AppCoreThread::OnResumeReady()
 
 	sApp.PostAppMethod( &Pcsx2App::leaveDebugMode );
 	_parent::OnResumeReady();
-
-	// kkdf2--
-	W2::UpdateScreens();
-	// --kkdf2
 }
 
 void AppCoreThread::OnPause()

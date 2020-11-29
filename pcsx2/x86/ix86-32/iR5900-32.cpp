@@ -47,7 +47,6 @@
 // kkdf2--
 #include "Haxkh2fm.h"
 #include "mypy.h"
-#include "W2.h"
 // --kkdf2
 
 using namespace x86Emitter;
@@ -1293,130 +1292,76 @@ void recompileNextInstruction(int delayslot)
 	cpuRegs.code = *(int *)s_pCode;
 
 	// kkdf2--
-	if (ElfCRC == 0xF266B00B) { // kh2fm
-		switch (pc) {
-			case 0x001adf00: // S_IEXPA
-				_freeX86regs();
-				xCALL((void *)Haxkh2fm_trap_S_IEXPA_rec);
+    bool fEat1 = false;
+    {
+		bool fBranch = false;
+		switch (_Opcode_) {
+			case 1:
+				switch (_Rt_) {
+					case 0:
+					case 1:
+					case 2:
+					case 3:
+					case 0x10:
+					case 0x11:
+					case 0x12:
+					case 0x13:
+						fBranch = true;
+				}
 				break;
 
-			case 0x001adf04: // S_IEXPA +4
-				iFlushCall(FLUSH_EVERYTHING);
-				xMOV(eax, ptr32[&g_injectSize]);
-				xCMP(eax, 0);
-				j8Ptr[0] = JE8(0);
-				xMOV(ptr32[&cpuRegs.pc], 0x001ae004);
-				xMOV(ptr32[&cpuRegs.GPR.n.v0.UL[0]], eax);
-				xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
-				xJMP((void *)DispatcherEvent);
-				x86SetJ8(j8Ptr[0]);
-				break;
-
-			case 0x001ae004: // E_IEXPA
-				_freeX86regs();
-				//_deleteGPRtoXMMreg(2, 1); // 2 -> v0REG
-				xCALL((void *)Haxkh2fm_trap_E_IEXPA);
-				break;
-
-			case 0x001ae308: // S_FINDX
-				_freeX86regs();
-				xCALL((void *)Haxkh2fm_trap_S_FINDX_rec);
-				break;
-
-			case 0x001ae454: // E_FINDX
-				_freeX86regs();
-				xCALL((void *)Haxkh2fm_trap_E_FINDX);
+			case 2:
+			case 3:
+			case 4:
+			case 5:
+			case 6:
+			case 7:
+			case 0x14:
+			case 0x15:
+			case 0x16:
+			case 0x17:
+				fBranch = true;
 				break;
 		}
-	}
 
-	bool fBranch = false;
-	switch (_Opcode_) {
-		case 1:
-			switch (_Rt_) {
-				case 0:
-				case 1:
-				case 2:
-				case 3:
-				case 0x10:
-				case 0x11:
-				case 0x12:
-				case 0x13:
-					fBranch = true;
+		bool fClearEat = false;
+		for (int x = 0; x < MAX_BRK; x++) {
+			if (pc == s_mypyBrk[x].pc) {
+				fClearEat = true;
+				break;
 			}
-			break;
-
-		case 2:
-		case 3:
-		case 4:
-		case 5:
-		case 6:
-		case 7:
-		case 0x14:
-		case 0x15:
-		case 0x16:
-		case 0x17:
-			fBranch = true;
-			break;
-	}
-
-	bool fEat1 = false;
-
-	bool fClearEat = false;
-	for (int x = 0; x < MAX_BRK; x++) {
-		if (pc == s_mypyBrk[x].pc) {
-			fClearEat = true;
-			break;
 		}
-	}
 
-	using namespace W2;
-
-	bool fStopWBrk = false;
-
-	for (int x = 0; x < MAX_WBRK && (x == 0 || s_wbrk[x].pc != 0); x++) {
-		if (pc == s_wbrk[x].pc) {
-			fClearEat = true;
-			fStopWBrk = true;
-		}
-	}
-
-	if (fClearEat) {
-		iFlushCall(FLUSH_EVERYTHING);
-		xMOV(ptr32[&cpuRegs.pc], pc);
-		//MOV32ItoM( (uptr)&pc, pc );
-		if (!fBranch && !delayslot) {
-			xMOV(ptr32[&s_mypyEat], 0);
-		}
-	}
-
-	for (int x = 0; x < MAX_BRK; x++) {
-		if (pc == s_mypyBrk[x].pc) {
-			xMOV(ptr32[&s_mypyHitBrk], (fBranch ? 512 : 0) | 256 | x);
-			xCALL((void *)MypyHitBrk);
+		if (fClearEat) {
+			iFlushCall(FLUSH_EVERYTHING);
+			xMOV(ptr32[&cpuRegs.pc], pc);
+			xMOV(ptr32[&s_mypy_pc], pc);
 			if (!fBranch && !delayslot) {
-				xOR(ptr32[&s_mypyEat], eax);
-				fEat1 = true;
+				xMOV(ptr32[&s_mypyEat], 0);
 			}
 		}
-	}
 
-	if (fStopWBrk) {
-		xCALL((void *)W2::WBrkptHit);
-		if (!fBranch && !delayslot) {
-			xOR(ptr32[&s_mypyEat], eax);
-			fEat1 = true;
+		for (int x = 0; x < MAX_BRK; x++) {
+			if (pc == s_mypyBrk[x].pc) {
+				xMOV(ptr32[&s_mypyHitBrk], (fBranch ? 512 : 0) | 256 | x);
+				xCALL((void *)MypyHitBrk);
+				if (!fBranch && !delayslot) {
+					xOR(ptr32[&s_mypyEat], eax);
+					fEat1 = true;
+				}
+			}
 		}
-	}
 
-	if (fEat1) {
-		xTEST(ptr32[&s_mypyEat], 2);
-		j8Ptr[0] = JZ8(0);
-		//MOV32ItoM( (uptr)&cpuRegs.pc, pc );
-		//MOV32ItoM( (uptr)&pc, pc );
-		xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
-		xJMP(DispatcherEvent);
-		x86SetJ8(j8Ptr[0]);
+		if (fEat1) {
+            xTEST(ptr8[&s_mypyEat], 2);
+            j8Ptr[0] = JZ8(0);
+            {
+                xMOV(eax, ptr32[&s_mypy_new_pc]);
+                xMOV(ptr32[&cpuRegs.pc], eax);
+                xJMP((void *)DispatcherEvent);
+            }
+            x86SetJ8(j8Ptr[0]);
+        }
 	}
 	// --kkdf2
 
@@ -1508,10 +1453,11 @@ void recompileNextInstruction(int delayslot)
 	if (fEat1) {
 		xTEST(ptr8[&s_mypyEat], 1);
 		j8Ptr[0] = JZ8(0);
-		xMOV(ptr32[&cpuRegs.pc], pc); // already +4
-		//MOV32ItoM( (uptr)&pc, pc ); // already +4
-		xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
-		xJMP(DispatcherEvent);
+        {
+			xMOV(ptr32[&cpuRegs.pc], pc); // already +4
+			xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
+            xJMP((void *)DispatcherEvent);
+        }
 		x86SetJ8(j8Ptr[0]);
 	}
 	// --kkdf2

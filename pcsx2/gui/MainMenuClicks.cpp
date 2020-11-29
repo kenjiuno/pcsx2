@@ -31,8 +31,6 @@
 
 #include "Utilities/IniInterface.h"
 
-#include "W2.h"
-
 #ifndef DISABLE_RECORDING
 #	include "Recording/InputRecording.h"
 #	include "Recording/VirtualPad.h"
@@ -678,17 +676,6 @@ void MainEmuFrame::Menu_Debug_Open_Click(wxCommandEvent &event)
 	DisassemblyDialog* dlg = wxGetApp().GetDisassemblyPtr();
 	if (dlg)
 		dlg->Show();
-}
-
-void MainEmuFrame::Menu_Debug_Open_PyMon_Click(wxCommandEvent &event)
-{
-    W2::ShowR5900();
-    W2::ShowREGs();
-    W2::ShowMEM();
-}
-
-void MainEmuFrame::Menu_Debug_MemoryDump_Click(wxCommandEvent &event)
-{
 }
 
 void MainEmuFrame::Menu_Debug_Logging_Click(wxCommandEvent &event)
