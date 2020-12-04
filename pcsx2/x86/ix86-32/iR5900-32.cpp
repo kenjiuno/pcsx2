@@ -1291,68 +1291,132 @@ void recompileNextInstruction(int delayslot)
 
 	cpuRegs.code = *(int *)s_pCode;
 
-	// kkdf2--
-    bool fEat1 = false;
+    // kkdf2--
+    bool eatSet = false;
     {
-		bool fBranch = false;
-		switch (_Opcode_) {
-			case 1:
-				switch (_Rt_) {
-					case 0:
-					case 1:
-					case 2:
-					case 3:
-					case 0x10:
-					case 0x11:
-					case 0x12:
-					case 0x13:
-						fBranch = true;
-				}
-				break;
+        bool branchOp = false;
+        bool loadOp = false;
+        bool storeOp = false;
+        switch (_Opcode_) {
+            case 0x01: //REGIMM
+                switch (_Rt_) {
+                    case 0x00: //BLTZ
+                    case 0x01: //BGEZ
+                    case 0x02: //BLTZL
+                    case 0x03: //BGEZL
+                    case 0x10: //BLTZAL
+                    case 0x11: //BGEZAL
+                    case 0x12: //BLTZALL
+                    case 0x13: //BGEZALL
+                        branchOp = true;
+                }
+                break;
+            case 0x02: //J
+            case 0x03: //JAL
+            case 0x04: //BEQ
+            case 0x05: //BNE
+            case 0x06: //BLEZ
+            case 0x07: //BGTZ
+            case 0x14: //BEQL
+            case 0x15: //BNEL
+            case 0x16: //BLEZL
+            case 0x17: //BGTZL
+                branchOp = true;
+                break;
+            case 0x1A: //LDL
+            case 0x1B: //LDR
+            case 0x1E: //LQ
+            case 0x20: //LB
+            case 0x21: //LH
+            case 0x22: //LWL
+            case 0x23: //LW
+            case 0x24: //LBU
+            case 0x25: //LHU
+            case 0x26: //LWR
+            case 0x27: //LWU
+            case 0x31: //LWC1
+            case 0x37: //LD
+                loadOp = true;
+                break;
+            case 0x1F: //SQ
+            case 0x28: //SB
+            case 0x29: //SH
+            case 0x2A: //SWL
+            case 0x2B: //SW
+            case 0x2C: //SDL
+            case 0x2D: //SDR
+            case 0x2E: //SWR
+            case 0x39: //SWC1
+            case 0x3F: //SD
+                storeOp = true;
+                break;
+        }
 
-			case 2:
-			case 3:
-			case 4:
-			case 5:
-			case 6:
-			case 7:
-			case 0x14:
-			case 0x15:
-			case 0x16:
-			case 0x17:
-				fBranch = true;
-				break;
-		}
+        bool useEat = false;
+        for (int x = 0; x < MAX_BRK; x++) {
+            if (pc == s_mypyBrk[x].pc || s_mypyRBrk[x].len != 0 || s_mypyWBrk[x].len != 0) {
+                useEat = true;
+                break;
+            }
+        }
 
-		bool fClearEat = false;
-		for (int x = 0; x < MAX_BRK; x++) {
-			if (pc == s_mypyBrk[x].pc) {
-				fClearEat = true;
-				break;
-			}
-		}
+        bool useRBrk = false; // very slow
+        if (loadOp) {
+            for (int x = 0; x < MAX_BRK; x++) {
+                if (s_mypyRBrk[x].len != 0) { // any break point set?
+                    useRBrk = true;
+                    useEat = true;
+                    break;
+                }
+            }
+        }
 
-		if (fClearEat) {
-			iFlushCall(FLUSH_EVERYTHING);
-			xMOV(ptr32[&cpuRegs.pc], pc);
-			xMOV(ptr32[&s_mypy_pc], pc);
-			if (!fBranch && !delayslot) {
-				xMOV(ptr32[&s_mypyEat], 0);
-			}
-		}
+        bool useWBrk = false; // very slow
+        if (storeOp) {
+            for (int x = 0; x < MAX_BRK; x++) {
+                if (s_mypyWBrk[x].len != 0) { // any break point set?
+                    useWBrk = true;
+                    useEat = true;
+                    break;
+                }
+            }
+        }
 
-		for (int x = 0; x < MAX_BRK; x++) {
-			if (pc == s_mypyBrk[x].pc) {
-				xMOV(ptr32[&s_mypyHitBrk], (fBranch ? 512 : 0) | 256 | x);
-				xCALL((void *)MypyHitBrk);
-				if (!fBranch && !delayslot) {
-					xOR(ptr32[&s_mypyEat], eax);
-					fEat1 = true;
-				}
-			}
-		}
+        if (useEat) {
+            iFlushCall(FLUSH_EVERYTHING);
+            xMOV(ptr32[&cpuRegs.pc], pc);
+            xMOV(ptr32[&s_mypy_pc], pc);
+            if (!branchOp && !delayslot) {
+                xMOV(ptr32[&s_mypyEat], 0);
+            }
+        }
 
-		if (fEat1) {
+        for (int x = 0; x < MAX_BRK; x++) {
+            if (pc == s_mypyBrk[x].pc) {
+                xMOV(ptr32[&s_mypyHitBrk], (branchOp ? 512 : 0) | 256 | x);
+                xCALL((void *)MypyHitBrk);
+                if (!branchOp && !delayslot) {
+                    xOR(ptr32[&s_mypyEat], eax);
+                    eatSet = true;
+                }
+            }
+        }
+
+        if (loadOp) {
+            xMOV(ptr32[&cpuRegs.code], cpuRegs.code); // write back
+            xCALL((void *)MypyTestRBrk);
+            xOR(ptr32[&s_mypyEat], eax);
+			eatSet = true;
+        }
+
+        if (storeOp) {
+            xMOV(ptr32[&cpuRegs.code], cpuRegs.code); // write back
+            xCALL((void *)MypyTestWBrk);
+            xOR(ptr32[&s_mypyEat], eax);
+            eatSet = true;
+        }
+
+        if (eatSet) {
             xTEST(ptr8[&s_mypyEat], 2);
             j8Ptr[0] = JZ8(0);
             {
@@ -1362,8 +1426,8 @@ void recompileNextInstruction(int delayslot)
             }
             x86SetJ8(j8Ptr[0]);
         }
-	}
-	// --kkdf2
+    }
+    // --kkdf2
 
 	if (!delayslot) {
 		pc += 4;
@@ -1449,18 +1513,18 @@ void recompileNextInstruction(int delayslot)
 //	_flushCachedRegs();
 //	g_cpuHasConstReg = 1;
 
-	// kkdf2--
-	if (fEat1) {
-		xTEST(ptr8[&s_mypyEat], 1);
-		j8Ptr[0] = JZ8(0);
+    // kkdf2--
+    if (eatSet) {
+        xTEST(ptr8[&s_mypyEat], 1);
+        j8Ptr[0] = JZ8(0);
         {
-			xMOV(ptr32[&cpuRegs.pc], pc); // already +4
-			xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
+            xMOV(ptr32[&cpuRegs.pc], pc); // already +4
+            xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
             xJMP((void *)DispatcherEvent);
         }
-		x86SetJ8(j8Ptr[0]);
-	}
-	// --kkdf2
+        x86SetJ8(j8Ptr[0]);
+    }
+    // --kkdf2
 
 	if (delayslot) {
 		pc += 4;

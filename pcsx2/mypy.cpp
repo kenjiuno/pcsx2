@@ -21,9 +21,6 @@
 u32 s_mypyHitBrk = 0;
 u32 s_mypyEat = 0;
 
-u64 s_mypyHitRMask = 0;
-u64 s_mypyHitWMask = 0;
-
 bool s_newbp = false; // A break point have updated. The recompiler needs refresh.
 bool s_newpc = false; // PC updated. The recompiler needs refresh.
 
@@ -289,7 +286,7 @@ static PyObject *pcsx2_GetUL0(PyObject *self, PyObject *args)
     if (PyLong_Check(py)) {
         long ri = PyLong_AsLong(py);
         if ((uint)ri < 32) {
-            return PyLong_FromLong(cpuRegs.GPR.r[ri & 31].UL[0]);
+            return PyLong_FromUnsignedLong(cpuRegs.GPR.r[ri & 31].UL[0]);
         }
 
         PyErr_Format(PyExc_IndexError, "%d isn't a GPR index. 0 to 31.", ri);
@@ -305,7 +302,7 @@ static PyObject *pcsx2_GetUL0(PyObject *self, PyObject *args)
 
         for (int x = 0; x < 32; x++) {
             if (wcscmp(pswGPRNames[x], pswName) == 0) {
-                return PyLong_FromLong(cpuRegs.GPR.r[x & 31].UL[0]);
+                return PyLong_FromUnsignedLong(cpuRegs.GPR.r[x & 31].UL[0]);
             }
         }
 
@@ -361,7 +358,7 @@ static PyObject *pcsx2_SetPC(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "I:pcsx2_SetPC", &newPC))
         return NULL;
 
-	s_newpc = true;
+    s_newpc = true;
     s_mypy_new_pc = newPC;
     Py_RETURN_NONE;
 }
@@ -373,7 +370,7 @@ static PyObject *pcsx2_ReadUI16(PyObject *self, PyObject *args)
         return NULL;
 
     u16 *pRd = (u16 *)PSM(off);
-    return PyLong_FromLong(*pRd);
+    return PyLong_FromUnsignedLong(*pRd);
 }
 
 static PyObject *pcsx2_ReadI16(PyObject *self, PyObject *args)
@@ -393,7 +390,7 @@ static PyObject *pcsx2_ReadUI32(PyObject *self, PyObject *args)
         return NULL;
 
     u32 *pRd = (u32 *)PSM(off);
-    return PyLong_FromLong(*pRd);
+    return PyLong_FromUnsignedLong(*pRd);
 }
 
 static PyObject *pcsx2_ReadI32(PyObject *self, PyObject *args)
@@ -413,7 +410,7 @@ static PyObject *pcsx2_ReadByte(PyObject *self, PyObject *args)
         return NULL;
 
     u8 *pRd = (u8 *)PSM(off);
-    return PyLong_FromLong(*pRd);
+    return PyLong_FromUnsignedLong(*pRd);
 }
 
 static PyObject *pcsx2_WriteUI32(PyObject *self, PyObject *args)
@@ -854,11 +851,17 @@ int MypyHitBrk()
     return 0;
 }
 
-int MypyHitRBrk()
+int MypyTestRBrk()
 {
+    const u32 target = cpuRegs.GPR.r[_Rs_].SL[0] + _Imm_;
+
+	s_newbp = false;
+    s_newpc = false;
+
     for (int x = 0; x < MAX_BRK; x++) {
-        if (0 == (s_mypyHitRMask & (1ULL << x)))
+        if (!s_mypyRBrk[x].Test(target)) {
             continue;
+        }
 
         int index = x;
         PyObject *pyfn = s_mypyRBrk[index].pyCb;
@@ -866,7 +869,7 @@ int MypyHitRBrk()
         PyGILState_STATE gstate = PyGILState_Ensure();
 
         if (PyCallable_Check(pyfn) == 1) {
-            PyObject *pyR = PyObject_CallObject(pyfn, NULL); // Return value: New reference
+            PyObject *pyR = PyObject_CallFunction(pyfn, "(I)", target); // Return value: New reference
             if (pyR != NULL) {
                 Py_CLEAR(pyR);
             } else {
@@ -878,14 +881,20 @@ int MypyHitRBrk()
         PyGILState_Release(gstate);
     }
 
-    return 0;
+    return (s_newbp ? 1 : 0) | (s_newpc ? 2 : 0);
 }
 
-int MypyHitWBrk()
+int MypyTestWBrk()
 {
+    const u32 target = cpuRegs.GPR.r[_Rs_].SL[0] + _Imm_;
+
+	s_newbp = false;
+    s_newpc = false;
+
     for (int x = 0; x < MAX_BRK; x++) {
-        if (0 == (s_mypyHitWMask & (1ULL << x)))
+        if (!s_mypyWBrk[x].Test(target)) {
             continue;
+        }
 
         int index = x;
         PyObject *pyfn = s_mypyWBrk[index].pyCb;
@@ -893,7 +902,7 @@ int MypyHitWBrk()
         PyGILState_STATE gstate = PyGILState_Ensure();
 
         if (PyCallable_Check(pyfn) == 1) {
-            PyObject *pyR = PyObject_CallObject(pyfn, NULL); // Return value: New reference
+            PyObject *pyR = PyObject_CallFunction(pyfn, "(I)", target); // Return value: New reference
             if (pyR != NULL) {
                 Py_CLEAR(pyR);
             } else {
@@ -905,7 +914,7 @@ int MypyHitWBrk()
         PyGILState_Release(gstate);
     }
 
-    return 0;
+    return (s_newbp ? 1 : 0) | (s_newpc ? 2 : 0);
 }
 
 extern VURegs vuRegs[2];

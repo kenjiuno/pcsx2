@@ -199,6 +199,8 @@ Write a byte to EE memory.
 
 ```py
 index = pcsx2.AddRBrk(addr, length, callable)
+
+callable(hitAddr)
 ```
 
 Set memory read break point. Max 32 read break points.
@@ -213,6 +215,8 @@ pcsx2.DelRBrk(index)
 
 ```py
 index = pcsx2.AddWBrk(addr, length, callable)
+
+callable(hitAddr)
 ```
 
 Set memory write break point. Max 32 write break points.

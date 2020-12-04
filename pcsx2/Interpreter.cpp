@@ -188,15 +188,39 @@ static void execI()
 
 	// kkdf2--
 	{
-		if (s_mypyHitRMask != 0) {
-			MypyHitRBrk();
-			s_mypyHitRMask = 0;
-		}
-
-		if (s_mypyHitWMask != 0) {
-			MypyHitWBrk();
-			s_mypyHitWMask = 0;
-		}
+        bool loadOp = false;
+        bool storeOp = false;
+        {
+            switch (_Opcode_) {
+                case 0x1A: //LDL
+                case 0x1B: //LDR
+                case 0x1E: //LQ
+                case 0x20: //LB
+                case 0x21: //LH
+                case 0x22: //LWL
+                case 0x23: //LW
+                case 0x24: //LBU
+                case 0x25: //LHU
+                case 0x26: //LWR
+                case 0x27: //LWU
+                case 0x31: //LWC1
+                case 0x37: //LD
+                    loadOp = true;
+                    break;
+                case 0x1F: //SQ
+                case 0x28: //SB
+                case 0x29: //SH
+                case 0x2A: //SWL
+                case 0x2B: //SW
+                case 0x2C: //SDL
+                case 0x2D: //SDR
+                case 0x2E: //SWR
+                case 0x39: //SWC1
+                case 0x3F: //SD
+                    storeOp = true;
+                    break;
+            }
+        }
 
 		s_mypyEat = 0;
 
@@ -209,6 +233,13 @@ static void execI()
 				s_mypyEat |= MypyHitBrk();
 			}
 		}
+
+		if (loadOp) {
+            s_mypyEat |= MypyTestRBrk();
+		}
+        if (storeOp) {
+            s_mypyEat |= MypyTestWBrk();
+        }
 
 		s_mypy_opc = pc;
 
