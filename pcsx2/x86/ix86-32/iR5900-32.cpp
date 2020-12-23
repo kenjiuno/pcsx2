@@ -1337,7 +1337,8 @@ void recompileNextInstruction(int delayslot)
             case 0x26: //LWR
             case 0x27: //LWU
             case 0x31: //LWC1
-            case 0x37: //LD
+			case 0x36: //LQC2
+			case 0x37: //LD
                 loadOp = true;
                 break;
             case 0x1F: //SQ
@@ -1349,7 +1350,8 @@ void recompileNextInstruction(int delayslot)
             case 0x2D: //SDR
             case 0x2E: //SWR
             case 0x39: //SWC1
-            case 0x3F: //SD
+			case 0x3E: //SQC2
+			case 0x3F: //SD
                 storeOp = true;
                 break;
         }
@@ -1411,7 +1413,7 @@ void recompileNextInstruction(int delayslot)
                 eatSet = true;
             }
             if (traceRead) {
-                iFlushCall(FLUSH_EVERYTHING);
+                iFlushCall(FLUSH_CODE);
 
 				xMOV(ptr32[&s_mypy_pc], pc);
 				xPUSH(1);
@@ -1419,8 +1421,7 @@ void recompileNextInstruction(int delayslot)
                 xADD(esp, 4);
 			}
         }
-
-        if (storeOp) {
+		else if (storeOp) {
             if (useWBrk) {
                 iFlushCall(FLUSH_CODE);
                 xCALL((void *)MypyTestWBrk);
@@ -1428,7 +1429,7 @@ void recompileNextInstruction(int delayslot)
                 eatSet = true;
             }
             if (traceWrite) {
-                iFlushCall(FLUSH_EVERYTHING);
+                iFlushCall(FLUSH_CODE);
 
 				xMOV(ptr32[&s_mypy_pc], pc);
 				xPUSH(2);

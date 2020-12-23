@@ -206,6 +206,7 @@ static void execI()
                 case 0x26: //LWR
                 case 0x27: //LWU
                 case 0x31: //LWC1
+				case 0x36: //LQC2
                 case 0x37: //LD
                     loadOp = true;
                     break;
@@ -218,7 +219,8 @@ static void execI()
                 case 0x2D: //SDR
                 case 0x2E: //SWR
                 case 0x39: //SWC1
-                case 0x3F: //SD
+				case 0x3E: //SQC2
+				case 0x3F: //SD
                     storeOp = true;
                     break;
             }
