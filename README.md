@@ -269,6 +269,58 @@ def onResume():
 	print('Resume')
 ```
 
-### pcsx2.StartEETrace
+### pcsx2.StartEETrace and pcsx2.EndEETrace
 
-### pcsx2.EndEETrace
+Write `trac2` record data. Only available on int mode. Format: https://gitlab.com/kenjiuno/khkh_xldM/-/blob/master/ee1Dec/trac2.bt
+
+```py
+tracer = 0
+
+@bp(0x00101e94)
+def TickIncr():
+    pcsx2.WriteLn('# Tick %d' % (pcsx2.GetUL0('t7'),))
+    global tracer
+    if tracer == 0:
+        tracer = 1
+        pcsx2.StartEETrace(str(exeDir.joinpath('oneround.bin')))
+    elif tracer == 1:
+        tracer = 2
+        pcsx2.EndEETrace()
+```
+
+### pcsx2.SetRWTraceOptions
+
+```py
+    pcsx2.SetRWTraceOptions(0, None)
+    pcsx2.FlushRWTrace()
+    pcsx2.SetRWTraceOptions(1, self.flush_rw_buffer)
+```
+
+```py
+pcsx2.SetRWTraceOptions(flags, callable)
+```
+
+flags:
+
+- 1 watch load opecodes
+- 2 watch store opecodes
+- 3 both
+
+callable:
+
+```py
+from struct import *
+
+class Class:
+    def flush_rw_buffer(self, buff: bytes):
+        for (pc, target, flags) in iter_unpack("<III", buff):
+            pass
+```
+
+### pcsx2.FlushRWTrace
+
+Flush queued read/write records buffer immediately.
+
+```py
+pcsx2.FlushRWTrace()
+```

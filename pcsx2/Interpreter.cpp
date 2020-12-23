@@ -190,6 +190,8 @@ static void execI()
 	{
         bool loadOp = false;
         bool storeOp = false;
+        const bool traceRead = 0 != (1 & s_mypy_rwTrace);
+        const bool traceWrite = 0 != (2 & s_mypy_rwTrace);
         {
             switch (_Opcode_) {
                 case 0x1A: //LDL
@@ -236,30 +238,40 @@ static void execI()
 
 		if (loadOp) {
             s_mypyEat |= MypyTestRBrk();
+            if (traceRead) {
+                mypyRecordRW(1);
+			}
 		}
         if (storeOp) {
             s_mypyEat |= MypyTestWBrk();
+            if (traceWrite) {
+                mypyRecordRW(2);
+            }
         }
-
-		s_mypy_opc = pc;
 
 		if (s_mypyEat & 2) {
             cpuRegs.pc = s_mypy_new_pc;
             return;
         }
-
-		if (s_feet != NULL) {
-			if (!MypyWriteEETrace(0)) {
-				fclose(s_feet);
-				s_feet = NULL;
-			}
-		}
 	}
 	// --kkdf2
 
 	cpuBlockCycles += opcode.cycles;
 
 	opcode.interpret();
+
+	// kkdf2--
+	{
+        if (s_feet != NULL) {
+            if (!MypyWriteEETrace(0)) {
+                fclose(s_feet);
+                s_feet = NULL;
+            }
+        }
+
+        s_mypy_opc = pc;
+    }
+	// --kkdf2
 }
 
 static __fi void _doBranch_shared(u32 tar)

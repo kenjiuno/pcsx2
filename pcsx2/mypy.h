@@ -55,4 +55,10 @@ extern int MypyTestWBrk();
 extern bool MypyWriteEETrace(int mask);
 extern FILE *s_feet;
 
+extern u32 s_mypy_rwTrace;
+extern bool mypyFlushRWTrace();
+extern void __cdecl mypyRecordRW(int isRead);
+
+extern void mypyResetCpu();
+
 #endif // _MYPY_H_

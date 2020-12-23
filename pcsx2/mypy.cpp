@@ -21,11 +21,16 @@
 u32 s_mypyHitBrk = 0;
 u32 s_mypyEat = 0;
 
-bool s_newbp = false; // A break point have updated. The recompiler needs refresh.
-bool s_newpc = false; // PC updated. The recompiler needs refresh.
+static bool s_newbp = false; // A break point have updated. The recompiler needs refresh.
+static bool s_newpc = false; // PC updated. The recompiler needs refresh.
 
 FILE *s_feet = NULL;
-u32 s_tracpos = 0;
+
+static u32 s_tracpos = 0;
+
+#define TRACE_MAX 4096
+static u32 s_rwTraceIdx = 0;
+static u32 s_rwTraceBuff[3 * TRACE_MAX];
 
 static PyObject *pcsx2_WriteLn(PyObject *self, PyObject *args)
 {
@@ -110,9 +115,6 @@ static PyObject *pcsx2_AddRBrk(PyObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "IIO:pcsx2_AddRBrk", &pc, &len, &pyCb))
         return NULL;
 
-    if (Cpu != &intCpu)
-        Console.WriteLn(L"(mypy)%s requires EmotionEngine is Interpreter!", "pcsx2_AddRBrk");
-
     int freei = -1;
     int curi = -1;
 
@@ -166,9 +168,6 @@ static PyObject *pcsx2_AddWBrk(PyObject *self, PyObject *args)
     PyObject *pyCb = NULL;
     if (!PyArg_ParseTuple(args, "IIO:pcsx2_AddWBrk", &pc, &len, &pyCb))
         return NULL;
-
-    if (Cpu != &intCpu)
-        Console.WriteLn(L"(mypy)%s requires EmotionEngine is Interpreter!", "pcsx2_AddWBrk");
 
     int freei = -1;
     int curi = -1;
@@ -522,7 +521,7 @@ static PyObject *pcsx2_StartEETrace(PyObject *self, PyObject *args)
         return NULL;
 
     if (Cpu != &intCpu)
-        Console.WriteLn(L"(mypy)%s requires EmotionEngine is Interpreter!", "pcsx2_StartEETrace");
+        Console.WriteLn(L"(mypy)%s requires EmotionEngine is Interpreter!", L"pcsx2_StartEETrace");
 
     if (s_feet != NULL)
         fclose(s_feet);
@@ -549,6 +548,34 @@ static PyObject *pcsx2_EndEETrace(PyObject *self)
         fclose(s_feet);
         s_feet = NULL;
     }
+
+    Py_RETURN_NONE;
+}
+
+PyObject *s_pycRWTrace = NULL;
+
+static PyObject *pcsx2_SetRWTraceOptions(PyObject *self, PyObject *args)
+{
+    uint flags = 0;
+    PyObject *pyCb = NULL;
+    if (!PyArg_ParseTuple(args, "IO:pcsx2_SetRWTraceOptions", &flags, &pyCb))
+        return NULL;
+
+    if (pyCb != Py_None && !PyCallable_Check(pyCb))
+        return PyErr_Format(PyExc_TypeError, "take a callable object.");
+
+	Py_CLEAR(s_pycRWTrace);
+    s_pycRWTrace = pyCb;
+    Py_XINCREF(s_pycRWTrace);
+
+    s_newbp = true;
+    s_mypy_rwTrace = flags;
+    Py_RETURN_NONE;
+}
+
+static PyObject *pcsx2_FlushRWTrace(PyObject *self)
+{
+    mypyFlushRWTrace();
 
     Py_RETURN_NONE;
 }
@@ -587,6 +614,9 @@ static PyMethodDef pcsx2_methods[] = {
 
     {"StartEETrace", pcsx2_StartEETrace, METH_VARARGS},
     {"EndEETrace", (PyCFunction)pcsx2_EndEETrace, METH_NOARGS},
+
+    {"SetRWTraceOptions", pcsx2_SetRWTraceOptions, METH_VARARGS},
+    {"FlushRWTrace", (PyCFunction)pcsx2_FlushRWTrace, METH_NOARGS},
     {NULL, NULL, 0, NULL},
 };
 
@@ -758,6 +788,10 @@ void mypyClearClient()
         s_feet = NULL;
     }
 
+    s_mypy_rwTrace = 0;
+    Py_CLEAR(s_pycRWTrace);
+    s_rwTraceIdx = 0;
+
     s_mypyHitBrk = 0;
 
     PyGILState_Release(gstate);
@@ -855,7 +889,7 @@ int MypyTestRBrk()
 {
     const u32 target = cpuRegs.GPR.r[_Rs_].SL[0] + _Imm_;
 
-	s_newbp = false;
+    s_newbp = false;
     s_newpc = false;
 
     for (int x = 0; x < MAX_BRK; x++) {
@@ -888,7 +922,7 @@ int MypyTestWBrk()
 {
     const u32 target = cpuRegs.GPR.r[_Rs_].SL[0] + _Imm_;
 
-	s_newbp = false;
+    s_newbp = false;
     s_newpc = false;
 
     for (int x = 0; x < MAX_BRK; x++) {
@@ -919,59 +953,245 @@ int MypyTestWBrk()
 
 extern VURegs vuRegs[2];
 
+// mask=0: write diff
+// mask=1: write full
 bool MypyWriteEETrace(int mask)
 {
-    if (s_feet == NULL)
+    if (s_feet == NULL) {
         return false;
-
-    if (mask & 1) {
-        char buff[1024] = {"trac1\n\0"};
-        fwrite(buff, 1024, 1, s_feet);
     }
 
-    if (1 != fwrite(&s_tracpos, 4, 1, s_feet))
-        return false;
-    if (1 != fwrite(&cpuRegs.GPR.r[0], 512, 1, s_feet))
-        return false;
-    if (1 != fwrite(&cpuRegs.pc, 4, 1, s_feet))
-        return false;
-    if (1 != fwrite(&fpuRegs.fpr[0], 4 * 32, 1, s_feet))
-        return false;
-    if (1 != fwrite(&fpuRegs.fprc[0], 4 * 32, 1, s_feet))
-        return false;
-    if (1 != fwrite(&fpuRegs.ACC, 4, 1, s_feet))
-        return false;
-    for (int x = 0; x < 32; x++)
-        if (1 != fwrite(&vuRegs[0].VF[x], 4 * 4, 1, s_feet))
-            return false;
-    for (int x = 0; x < 32; x++)
-        if (1 != fwrite(&vuRegs[0].VI[x], 4, 1, s_feet))
-            return false;
-    if (1 != fwrite(&vuRegs[0].ACC, 4 * 4, 1, s_feet))
-        return false;
-    if (1 != fwrite(&vuRegs[0].q, 4, 1, s_feet))
-        return false;
-    if (1 != fwrite(&vuRegs[0].p, 4, 1, s_feet))
-        return false;
-
     if (mask & 1) {
-        u32 pair[2] = {0, 1024 * 1024 * 32};
-        if (1 != fwrite(&pair[0], 8, 1, s_feet))
+        static char header[1024] = {"trac2\n\x1a\0"};
+        if (1 != fwrite(header, 1024, 1, s_feet)) {
             return false;
-        for (u32 x = pair[0], cx = pair[1]; x < cx; x += 4096) {
-            const void *pSrc = PSM(x);
-            if (1 != fwrite(pSrc, 4096, 1, s_feet))
-                return false;
         }
     }
 
-    u8 term[8] = {0};
-
-    if (1 != fwrite(&term[0], 8, 1, s_feet))
+    if (1 != fwrite("$$$$", 4, 1, s_feet)) {
         return false;
+    }
+
+    class LocalWriter
+    {
+        // 32bytes(256 flags) +diffBuff
+        u8 buff[4096];
+        int pos;
+        bool overflow;
+
+    public:
+        LocalWriter()
+        {
+            Reset();
+        }
+
+        void Reset()
+        {
+            memset(buff, 0, 32);
+            pos = 32;
+            overflow = false;
+        }
+
+        void WriteAlways(const void *src, int size)
+        {
+            if (u32(pos + size) < u32(sizeof(buff)) && !overflow) {
+                memcpy(buff + pos, src, size);
+                pos += size;
+            } else {
+                overflow |= true;
+            }
+        }
+
+        bool WriteTo(FILE *file)
+        {
+            return !overflow && 1 == fwrite(buff, pos, 1, file);
+        }
+
+        void WriteConditional(bool always, const void *latestVal, int size, void *prevAndUpdatableVal, int flagNum)
+        {
+            if (always || memcmp(latestVal, prevAndUpdatableVal, size) != 0) {
+                buff[flagNum / 8] |= 1 << (flagNum & 7);
+
+                memcpy(prevAndUpdatableVal, latestVal, size);
+                WriteAlways(latestVal, size);
+            }
+        }
+    };
+
+    static cpuRegisters prevCpuRegs;
+    static fpuRegisters prevFpuRegs;
+    static VURegs prevVuRegs[2];
+
+    {
+        static LocalWriter writer;
+        writer.Reset();
+        writer.WriteAlways(&s_tracpos, 4);
+        writer.WriteAlways(&s_mypy_pc, 4);
+        for (int x = 0; x < 32; x++) {
+            writer.WriteConditional(mask, &cpuRegs.GPR.r[x], 16, &prevCpuRegs.GPR.r[x], 0 + x);
+        }
+        for (int x = 0; x < 32; x++) {
+            writer.WriteConditional(mask, &fpuRegs.fpr[x], 4, &prevFpuRegs.fpr[x], 32 + x);
+        }
+        for (int x = 0; x < 32; x++) {
+            writer.WriteConditional(mask, &fpuRegs.fprc[x], 4, &prevFpuRegs.fprc[x], 64 + x);
+        }
+        writer.WriteConditional(mask, &fpuRegs.ACC, 4, &prevFpuRegs.ACC, 96);
+        for (int x = 0; x < 32; x++) {
+            writer.WriteConditional(mask, &vuRegs[0].VF[x], 4 * 4, &prevVuRegs[0].VF[x], 128 + x);
+        }
+        for (int x = 0; x < 32; x++) {
+            writer.WriteConditional(mask, &vuRegs[0].VI[x], 4, &prevVuRegs[0].VI[x], 160 + x);
+        }
+        writer.WriteConditional(mask, &vuRegs[0].ACC, 16, &prevVuRegs[0].ACC, 192);
+        writer.WriteConditional(mask, &vuRegs[0].q, 4, &prevVuRegs[0].q, 193);
+        writer.WriteConditional(mask, &vuRegs[0].p, 4, &prevVuRegs[0].p, 194);
+
+        static const int zero = 0;
+        writer.WriteAlways(&zero, 4);
+
+        if (!writer.WriteTo(s_feet)) {
+            return false;
+        }
+    }
+
+    const int VTLB_PAGE_SIZE = 4096;
+    const int VTLB_PAGE_MASK = 4095;
+    const size_t RamSize = 32 * 1024 * 1024;
+
+    {
+        static u8 prevRamData[RamSize];
+
+        if (mask & 1) {
+            static const u32 pair[2] = {0, 1024 * 1024 * 32};
+            if (1 != fwrite(&pair[0], 8, 1, s_feet)) {
+                return false;
+            }
+            for (u32 x = pair[0], cx = pair[1]; x < cx; x += VTLB_PAGE_SIZE) {
+                const void *pSrc = PSM(x);
+                if (1 != fwrite(pSrc, VTLB_PAGE_SIZE, 1, s_feet)) {
+                    return false;
+                }
+                memcpy(prevRamData + x, pSrc, VTLB_PAGE_SIZE);
+            }
+        } else if (false && false) {
+            class PsmHelper
+            {
+            private:
+                const u8 *table;
+                u32 selector;
+
+            public:
+                PsmHelper()
+                    : selector(-1)
+                {
+                }
+
+                inline u8 ReadByteAt(u32 adr)
+                {
+                    if (selector != (adr & (~VTLB_PAGE_MASK))) {
+                        selector = (adr & (~VTLB_PAGE_MASK));
+                        table = reinterpret_cast<const u8 *>(PSM(selector));
+                    }
+                    return table[adr & VTLB_PAGE_MASK];
+                }
+            } psmHelper;
+
+            for (u32 x = 0; x < RamSize; x++) {
+                u8 readByte;
+                if ((readByte = psmHelper.ReadByteAt(x)) != prevRamData[x]) {
+                    prevRamData[x] = readByte;
+                    u32 scan = x + 1;
+                    while (scan < RamSize && (readByte = psmHelper.ReadByteAt(scan)) != prevRamData[scan]) {
+                        prevRamData[scan] = readByte;
+                        ++scan;
+                    }
+
+                    u32 pair[2] = {x, scan - x};
+                    if (1 != fwrite(pair, 8, 1, s_feet)) {
+                        return false;
+                    }
+                    if (1 != fwrite(prevRamData + pair[0], pair[1], 1, s_feet)) {
+                        return false;
+                    }
+
+                    x = scan;
+                }
+            }
+        }
+    }
+
+    {
+        static const u8 terminator[8] = {0};
+
+        if (1 != fwrite(&terminator[0], 8, 1, s_feet)) {
+            return false;
+        }
+    }
 
     s_tracpos++;
     return true;
+}
+
+u32 s_mypy_rwTrace = 0;
+
+bool mypyFlushRWTrace()
+{
+	if (s_rwTraceIdx == 0) {
+		return true;
+	}
+	if (Py_None == s_pycRWTrace) {
+		s_rwTraceIdx = 0;
+		return true;
+	}
+
+	wxASSERT(PyCallable_Check(s_pycRWTrace));
+
+	PyObject *pyBuff = PyBytes_FromStringAndSize((const char *)s_rwTraceBuff, 12 * s_rwTraceIdx);
+	if (pyBuff != NULL) {
+		PyObject *pyRes = PyObject_CallFunction(s_pycRWTrace, "(O)", pyBuff); // Return value: New reference
+		Py_CLEAR(pyBuff);
+		if (pyRes != NULL) {
+			Py_CLEAR(pyRes);
+			s_rwTraceIdx = 0;
+			return true;
+		}
+	}
+
+	mypyPrintErr();
+    PyErr_Clear();
+
+    s_rwTraceIdx = 0;
+    s_mypy_rwTrace = 0;
+
+    return false;
+}
+
+void __cdecl mypyRecordRW(int flags)
+{
+    if (s_mypy_rwTrace == 0) {
+        // stop recording by py err.
+        return;
+    }
+
+    if (s_rwTraceIdx >= TRACE_MAX) {
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        bool ok = mypyFlushRWTrace();
+        PyGILState_Release(gstate);
+        if (!ok) {
+            return;
+        }
+    }
+
+    int pos = 3 * s_rwTraceIdx;
+    s_rwTraceBuff[pos + 0] = s_mypy_pc;
+    s_rwTraceBuff[pos + 1] = cpuRegs.GPR.r[_Rs_].SL[0] + _Imm_;
+    s_rwTraceBuff[pos + 2] = flags;
+	++s_rwTraceIdx;
+}
+
+void mypyResetCpu() {
+	Cpu->Reset();
 }
 
 // --kkdf2

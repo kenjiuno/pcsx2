@@ -1297,6 +1297,8 @@ void recompileNextInstruction(int delayslot)
         bool branchOp = false;
         bool loadOp = false;
         bool storeOp = false;
+        const bool traceRead = 0 != (1 & s_mypy_rwTrace);
+        const bool traceWrite = 0 != (2 & s_mypy_rwTrace);
         switch (_Opcode_) {
             case 0x01: //REGIMM
                 switch (_Rt_) {
@@ -1384,7 +1386,6 @@ void recompileNextInstruction(int delayslot)
 
         if (useEat) {
             iFlushCall(FLUSH_EVERYTHING);
-            xMOV(ptr32[&cpuRegs.pc], pc);
             xMOV(ptr32[&s_mypy_pc], pc);
             if (!branchOp && !delayslot) {
                 xMOV(ptr32[&s_mypyEat], 0);
@@ -1403,17 +1404,37 @@ void recompileNextInstruction(int delayslot)
         }
 
         if (loadOp) {
-            xMOV(ptr32[&cpuRegs.code], cpuRegs.code); // write back
-            xCALL((void *)MypyTestRBrk);
-            xOR(ptr32[&s_mypyEat], eax);
-			eatSet = true;
+            if (useRBrk) {
+                iFlushCall(FLUSH_CODE);
+                xCALL((void *)MypyTestRBrk);
+                xOR(ptr32[&s_mypyEat], eax);
+                eatSet = true;
+            }
+            if (traceRead) {
+                iFlushCall(FLUSH_EVERYTHING);
+
+				xMOV(ptr32[&s_mypy_pc], pc);
+				xPUSH(1);
+                xCALL((void *)mypyRecordRW);
+                xADD(esp, 4);
+			}
         }
 
         if (storeOp) {
-            xMOV(ptr32[&cpuRegs.code], cpuRegs.code); // write back
-            xCALL((void *)MypyTestWBrk);
-            xOR(ptr32[&s_mypyEat], eax);
-            eatSet = true;
+            if (useWBrk) {
+                iFlushCall(FLUSH_CODE);
+                xCALL((void *)MypyTestWBrk);
+                xOR(ptr32[&s_mypyEat], eax);
+                eatSet = true;
+            }
+            if (traceWrite) {
+                iFlushCall(FLUSH_EVERYTHING);
+
+				xMOV(ptr32[&s_mypy_pc], pc);
+				xPUSH(2);
+                xCALL((void *)mypyRecordRW);
+                xADD(esp, 4);
+            }
         }
 
         if (eatSet) {
@@ -1520,6 +1541,7 @@ void recompileNextInstruction(int delayslot)
         {
             xMOV(ptr32[&cpuRegs.pc], pc); // already +4
             xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
+			xCALL((void *)mypyResetCpu);
             xJMP((void *)DispatcherEvent);
         }
         x86SetJ8(j8Ptr[0]);
