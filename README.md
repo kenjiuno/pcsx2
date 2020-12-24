@@ -1,4 +1,4 @@
-# [PCSX2-py-mon] PCSX2: Execution monitor with Python 3.8
+# [PCSX2-execmon] PCSX2: Execution monitor with Python 3.8
 
 ## Overview
 
@@ -274,6 +274,8 @@ Return Game CRC in long value.
 
 ### pcsx2.OnSuspend
 
+OnSuspend is holded only last one.
+
 ```py
 @pcsx2.OnSuspend
 def onSuspend():
@@ -282,6 +284,8 @@ def onSuspend():
 ```
 
 ### pcsx2.OnResume
+
+OnResume is holded only last one.
 
 ```py
 @pcsx2.OnResume
