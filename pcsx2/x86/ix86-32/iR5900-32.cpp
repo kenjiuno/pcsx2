@@ -1354,17 +1354,19 @@ void recompileNextInstruction(int delayslot)
                 break;
         }
 
-		execmonInjected = execmon::testAnyInjection();
+		execmonInjected = execmon::testInjections(pc) & (4 | (loadOp ? 1 : 0) | (storeOp ? 2 : 0));
 
 		if (execmonInjected) {
             iFlushCall(FLUSH_EVERYTHING | FLUSH_CODE);
             xMOV(ptr32[&execmon::currentPc], pc);
             xCALL((void *)execmon::exitstatus::clear);
-            xCALL((void *)execmon::brk::invoke);
-            if (loadOp) {
+            if (4 & execmonInjected) {
+				xCALL((void *)execmon::brk::invoke);
+			}
+            if (1 & execmonInjected) {
                 xCALL((void *)execmon::encounterLoadOp);
             }
-            if (storeOp) {
+            if (2 & execmonInjected) {
                 xCALL((void *)execmon::encounterStoreOp);
             }
             xCALL((void *)execmon::exitstatus::eject);

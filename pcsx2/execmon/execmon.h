@@ -12,7 +12,7 @@ extern u32 s_mypy_opc;
 void __cdecl encounterLoadOp();
 void __cdecl encounterStoreOp();
 void __cdecl invokeCpuReset();
-bool testAnyInjection();
+int testInjections(u32 pc);
 
 namespace exitstatus
 {
@@ -53,7 +53,6 @@ namespace brk
 struct Item
 {
     int key;
-    u32 pc;
     utils::UniquePyObject callable;
 };
 typedef std::multimap<u32, Item> Items;
@@ -122,7 +121,7 @@ struct RWTrace
     u32 s_rwTraceBuff[3 * MaxTrace];
 
     inline const void *buffPtr() { return s_rwTraceBuff; }
-    inline int buffSize() { return 3 * s_rwTraceIdx; }
+    inline int buffSize() { return 12 * s_rwTraceIdx; }
 
     inline bool traceRead() { return 0 != (1 & s_mypy_rwTrace); }
 

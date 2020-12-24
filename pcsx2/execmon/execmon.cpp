@@ -75,8 +75,8 @@ int add(u32 pc, PyObject *callable)
 
     Items::iterator iter = items.insert(std::make_pair(pc, Item()));
     iter->second.key = utils::keyGen.alloc();
-    iter->second.pc = pc;
     iter->second.callable.reset(callable);
+    Py_XINCREF(callable);
 
     return iter->second.key;
 }
@@ -91,6 +91,7 @@ int add(u32 addr, u32 size, PyObject *callable)
     Items::iterator iter = items.insert(items.end(), Item());
     iter->key = utils::keyGen.alloc();
     iter->callable.reset(callable);
+    Py_XINCREF(callable);
 
     return iter->key;
 }
@@ -118,6 +119,7 @@ int add(u32 addr, u32 size, PyObject *callable)
     Items::iterator iter = items.insert(items.end(), Item());
     iter->key = utils::keyGen.alloc();
     iter->callable.reset(callable);
+    Py_XINCREF(callable);
 
     return iter->key;
 }
@@ -143,7 +145,7 @@ EETrace eetrace;
 bool EETrace::MypyWriteEETrace(int mask)
 {
     if (s_feet == NULL) {
-        return false;
+        return true; // not error
     }
 
     if (mask & 1) {
@@ -371,7 +373,12 @@ void mypyClearClient()
 {
     PyGILState_STATE gstate = PyGILState_Ensure();
 
+    utils::keyGen.reset();
+
     brk::items.clear();
+    rbrk::items.clear();
+    wbrk::items.clear();
+
     onSuspendCallable.release();
     onResumeCallable.release();
 
@@ -1008,21 +1015,19 @@ namespace brk
 {
 void __cdecl invoke()
 {
-    Items::iterator iter = items.begin();
-    for (; iter != items.end(); iter++) {
-        if (iter->first == currentPc) {
-            PyGILState_STATE gstate = PyGILState_Ensure();
-            PyObject *callable = iter->second.callable.get();
+    Items::iterator iter = items.lower_bound(currentPc);
+    for (; iter->first == currentPc && iter != items.end(); iter++) {
+        PyGILState_STATE gstate = PyGILState_Ensure();
+        PyObject *callable = iter->second.callable.get();
 
-            if (PyCallable_Check(callable) == 1) {
-                utils::UniquePyObject result(PyObject_CallObject(callable, NULL));
-                if (result.get() == NULL) {
-                    py::mypyPrintErr();
-                }
+        if (PyCallable_Check(callable) == 1) {
+            utils::UniquePyObject result(PyObject_CallObject(callable, NULL));
+            if (result.get() == NULL) {
+                py::mypyPrintErr();
             }
-
-            PyGILState_Release(gstate);
         }
+
+        PyGILState_Release(gstate);
     }
 }
 } // namespace brk
@@ -1120,9 +1125,9 @@ void __cdecl invokeCpuReset()
     Cpu->Reset();
 }
 
-bool testAnyInjection()
+int testInjections(u32 pc)
 {
-    return !brk::items.empty() || !rbrk::items.empty() || !wbrk::items.empty();
+    return ((brk::items.find(pc) == brk::items.end()) ? 0 : 4) | (rbrk::items.empty() ? 0 : 1) | (wbrk::items.empty() ? 0 : 2);
 }
 
 } // namespace execmon
