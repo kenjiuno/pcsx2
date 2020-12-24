@@ -90,6 +90,8 @@ int add(u32 addr, u32 size, PyObject *callable)
 {
     Items::iterator iter = items.insert(items.end(), Item());
     iter->key = utils::keyGen.alloc();
+    iter->addr = addr;
+    iter->size = size;
     iter->callable.reset(callable);
     Py_XINCREF(callable);
 
