@@ -12,7 +12,14 @@ extern u32 s_mypy_opc;
 void __cdecl encounterLoadOp();
 void __cdecl encounterStoreOp();
 void __cdecl invokeCpuReset();
-int testInjections(u32 pc);
+int makeInterceptorPlan(u32 pc);
+
+enum RecompilerInterceptorPlanner {
+    loadOpInterceptor = 1,
+    storeOpInterceptor = 2,
+    execInterceptor = 4,
+    readOnlyDeclaration = 8,
+};
 
 namespace exitstatus
 {
@@ -58,6 +65,7 @@ struct Item
 typedef std::multimap<u32, Item> Items;
 extern Items items;
 int add(u32 pc, PyObject *callable);
+bool remove(int key);
 void __cdecl invoke();
 } // namespace brk
 

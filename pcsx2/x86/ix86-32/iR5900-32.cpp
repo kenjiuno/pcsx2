@@ -1291,8 +1291,8 @@ void recompileNextInstruction(int delayslot)
 	cpuRegs.code = *(int *)s_pCode;
 
     // kkdf2--
-    u32 execmonInjected = 0;
-    static u8 execmonEaten = 0;
+    u32 execmonPlanner = 0;
+    static u8 execmonExitStatus = 0;
     {
         bool branchOp = false;
         bool loadOp = false;
@@ -1354,32 +1354,47 @@ void recompileNextInstruction(int delayslot)
                 break;
         }
 
-		execmonInjected = execmon::testInjections(pc) & (4 | (loadOp ? 1 : 0) | (storeOp ? 2 : 0));
+		execmonPlanner =
+            execmon::makeInterceptorPlan(pc) &
+            (execmon::execInterceptor |
+             execmon::readOnlyDeclaration |
+             (loadOp ? execmon::loadOpInterceptor : 0) |
+             (storeOp ? execmon::storeOpInterceptor : 0));
 
-		if (execmonInjected) {
-            iFlushCall(FLUSH_EVERYTHING | FLUSH_CODE);
+		if (execmonPlanner) {
             xMOV(ptr32[&execmon::currentPc], pc);
-            xCALL((void *)execmon::exitstatus::clear);
-            if (4 & execmonInjected) {
+
+            if (execmon::readOnlyDeclaration & execmonPlanner) {
+                iFlushCall(FLUSH_CODE);
+            }
+			else {
+                iFlushCall(FLUSH_EVERYTHING | FLUSH_CODE);
+                xCALL((void *)execmon::exitstatus::clear);
+            }
+
+            if (execmon::execInterceptor & execmonPlanner) {
 				xCALL((void *)execmon::brk::invoke);
 			}
-            if (1 & execmonInjected) {
+            if (execmon::loadOpInterceptor & execmonPlanner) {
                 xCALL((void *)execmon::encounterLoadOp);
             }
-            if (2 & execmonInjected) {
+            if (execmon::storeOpInterceptor & execmonPlanner) {
                 xCALL((void *)execmon::encounterStoreOp);
             }
-            xCALL((void *)execmon::exitstatus::eject);
-            xMOV(ptr8[&execmonEaten], al);
 
-		    xTEST(eax, execmon::exitstatus::Deorbit);
-            j8Ptr[0] = JZ8(0);
-            {
-                xMOV(eax, ptr32[&execmon::exitstatus::s_mypy_new_pc]);
-                xMOV(ptr32[&cpuRegs.pc], eax);
-                xJMP((void *)DispatcherEvent);
-            }
-            x86SetJ8(j8Ptr[0]);
+            if (!(execmon::readOnlyDeclaration & execmonPlanner)) {
+				xCALL((void *)execmon::exitstatus::eject);
+				xMOV(ptr8[&execmonExitStatus], al);
+
+				xTEST(eax, execmon::exitstatus::Deorbit);
+				j8Ptr[0] = JZ8(0);
+				{
+					xMOV(eax, ptr32[&execmon::exitstatus::s_mypy_new_pc]);
+					xMOV(ptr32[&cpuRegs.pc], eax);
+					xJMP((void *)DispatcherEvent);
+				}
+				x86SetJ8(j8Ptr[0]);
+			}
         }
     }
     // --kkdf2
@@ -1469,8 +1484,8 @@ void recompileNextInstruction(int delayslot)
 //	g_cpuHasConstReg = 1;
 
     // kkdf2--
-    if (execmonInjected) {
-        xTEST(ptr8[&execmonEaten], execmon::exitstatus::resetCpu);
+    if (execmonPlanner && !(execmon::readOnlyDeclaration & execmonPlanner)) {
+        xTEST(ptr8[&execmonExitStatus], execmon::exitstatus::resetCpu);
         j8Ptr[0] = JZ8(0);
         {
             xMOV(ptr32[&cpuRegs.pc], pc); // already +4

@@ -56,7 +56,7 @@ Write line to pcsx2 debug window.
 ### pcsx2.AddBrk
 
 ```py
-pcsx2.AddBrk(addr, callable)
+cookie = pcsx2.AddBrk(addr, callable)
 ```
 
 ```py
@@ -72,7 +72,11 @@ def S_ASSERT():
 	print(read0Str(pcsx2.GetUL0('a0')))
 ```
 
-Add breakpoint (max 32)
+### pcsx2.DelBrk
+
+```py
+pcsx2.DelBrk(cookie)
+```
 
 ### pcsx2.GetUL0
 
@@ -198,49 +202,65 @@ Write a byte to EE memory.
 ### pcsx2.AddRBrk
 
 ```py
-index = pcsx2.AddRBrk(addr, length, callable)
+cookie = pcsx2.AddRBrk(addr, length, callable)
 
 callable(hitAddr)
 ```
 
-Set memory read break point. Max 32 read break points.
+Set read break point of every load operators.
 
 ### pcsx2.DelRBrk
 
 ```py
-pcsx2.DelRBrk(index)
+pcsx2.DelRBrk(cookie)
 ```
 
 ### pcsx2.AddWBrk
 
 ```py
-index = pcsx2.AddWBrk(addr, length, callable)
+cookie = pcsx2.AddWBrk(addr, length, callable)
 
 callable(hitAddr)
 ```
 
-Set memory write break point. Max 32 write break points.
+Set write break point of every store operators.
 
 ### pcsx2.DelWBrk
 
 ```py
-pcsx2.DelWBrk(index)
+pcsx2.DelWBrk(cookie)
 ```
 
 ### pcsx2.pc
+
+```py
+pc = pcsx2.pc()
+```
 
 Return current `pc` (program counter).
 
 ### pcsx2.opc
 
+```py
+opc = pcsx2.opc()
+```
+
 Return old (previous) `pc` (program counter) only for int mode.
 
 ### pcsx2.isRec
+
+```py
+mode = pcsx2.isRec()
+```
 
 - True if rec mode.
 - False if int mode.
 
 ### pcsx2.ElfCRC
+
+```py
+crc = pcsx2.ElfCRC()
+```
 
 Return Game CRC in long value.
 
@@ -289,6 +309,8 @@ def TickIncr():
 ```
 
 ### pcsx2.SetRWTraceOptions
+
+A read/write reporter.
 
 ```py
     pcsx2.SetRWTraceOptions(0, None)

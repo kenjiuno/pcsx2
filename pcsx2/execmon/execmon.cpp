@@ -80,6 +80,20 @@ int add(u32 pc, PyObject *callable)
 
     return iter->second.key;
 }
+bool remove(int key)
+{
+    Items::iterator iter = items.begin();
+    bool any = false;
+    for (; iter != items.end();) {
+        if (iter->second.key == key) {
+            iter = items.erase(iter);
+            any |= true;
+        } else {
+            iter++;
+        }
+    }
+    return any;
+}
 
 } // namespace brk
 
@@ -326,21 +340,11 @@ namespace py
 {
 void mypyPrintErr()
 {
-    PyObject *pyT, *pyV, *pyTB;
-    PyErr_Fetch(&pyT, &pyV, &pyTB);
-    //Console.WriteLn( L"%p, %p, %p", pyT, pyV, pyTB );
-    if (pyV != NULL) {
-        PyObject *pySt = PyObject_Str(pyT);
-        PyObject *pySv = PyObject_Str(pyV);
-        PyObject *pyStb = PyObject_Str(pyTB);
-        Console.Error(L"%s: %s\n%s", PyUnicode_AS_UNICODE(pySt), PyUnicode_AS_UNICODE(pySv), PyUnicode_AS_UNICODE(pyStb));
-        Py_CLEAR(pySt);
-        Py_CLEAR(pySv);
-        Py_CLEAR(pyStb);
+    // assume you have overridden sys.stderr
+    if (PyErr_Occurred() != NULL) {
+        PyErr_PrintEx(1);
+        PyErr_Clear();
     }
-    Py_CLEAR(pyT);
-    Py_CLEAR(pyV);
-    Py_CLEAR(pyTB);
 }
 
 void mypyEnsureMod(wxString pyFile)
@@ -511,6 +515,17 @@ PyObject *pcsx2ModuleBuilder(void)
 
             exitstatus::s_newbp = true;
             return PyLong_FromLong(token);
+        }
+
+        static PyObject *DelBrk(PyObject *self, PyObject *args)
+        {
+            uint token = 0;
+            if (!PyArg_ParseTuple(args, "I:pcsx2_DelBrk", &token))
+                return NULL;
+
+            brk::remove(token);
+
+            Py_RETURN_NONE;
         }
 
         static PyObject *AddRBrk(PyObject *self, PyObject *args)
@@ -906,6 +921,7 @@ PyObject *pcsx2ModuleBuilder(void)
         {"ClearClient", (PyCFunction)methods::ClearClient, METH_NOARGS},
         {"WriteLn", methods::WriteLn, METH_VARARGS},
         {"AddBrk", methods::AddBrk, METH_VARARGS},
+        {"DelBrk", methods::DelBrk, METH_VARARGS},
         {"GetUL0", methods::GetUL0, METH_VARARGS},
         {"SetUL0", methods::SetUL0, METH_VARARGS},
         {"SetPC", methods::SetPC, METH_VARARGS},
@@ -1127,9 +1143,11 @@ void __cdecl invokeCpuReset()
     Cpu->Reset();
 }
 
-int testInjections(u32 pc)
+int makeInterceptorPlan(u32 pc)
 {
-    return ((brk::items.lower_bound(pc) == brk::items.end()) ? 0 : 4) | (rbrk::items.empty() ? 0 : 1) | (wbrk::items.empty() ? 0 : 2);
+    return ((brk::items.find(pc) == brk::items.end()) ? 0 : execInterceptor) |
+           (rbrk::items.empty() ? 0 : loadOpInterceptor) |
+           (wbrk::items.empty() ? 0 : storeOpInterceptor);
 }
 
 } // namespace execmon
