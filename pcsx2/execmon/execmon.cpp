@@ -799,7 +799,7 @@ PyObject *pcsx2ModuleBuilder(void)
             if (!PyArg_ParseTuple(args, "O:pcsx2_OnSuspend", &callable))
                 return NULL;
 
-            if (PyCallable_Check(callable) == 0)
+            if (!PyCallable_Check(callable))
                 return PyErr_Format(PyExc_TypeError, "take a callable object.");
 
             onSuspendCallable.reset(callable);
@@ -814,7 +814,7 @@ PyObject *pcsx2ModuleBuilder(void)
             if (!PyArg_ParseTuple(args, "O:pcsx2_OnResume", &callable))
                 return NULL;
 
-            if (PyCallable_Check(callable) == 0)
+            if (!PyCallable_Check(callable))
                 return PyErr_Format(PyExc_TypeError, "take a callable object.");
 
             onResumeCallable.reset(callable);
@@ -1016,11 +1016,11 @@ namespace brk
 void __cdecl invoke()
 {
     Items::iterator iter = items.lower_bound(currentPc);
-    for (; iter->first == currentPc && iter != items.end(); iter++) {
+    for (; iter != items.end() && iter->first == currentPc; iter++) {
         PyGILState_STATE gstate = PyGILState_Ensure();
         PyObject *callable = iter->second.callable.get();
 
-        if (PyCallable_Check(callable) == 1) {
+        if (PyCallable_Check(callable)) {
             utils::UniquePyObject result(PyObject_CallObject(callable, NULL));
             if (result.get() == NULL) {
                 py::mypyPrintErr();
@@ -1044,7 +1044,7 @@ void __cdecl invoke()
             PyGILState_STATE gstate = PyGILState_Ensure();
             PyObject *callable = iter->callable.get();
 
-            if (PyCallable_Check(callable) == 1) {
+            if (PyCallable_Check(callable)) {
                 utils::UniquePyObject result(PyObject_CallFunction(callable, "(I)", target));
 
                 if (result.get() == NULL) {
@@ -1071,7 +1071,7 @@ void __cdecl invoke()
             PyGILState_STATE gstate = PyGILState_Ensure();
             PyObject *callable = iter->callable.get();
 
-            if (PyCallable_Check(callable) == 1) {
+            if (PyCallable_Check(callable)) {
                 utils::UniquePyObject result(PyObject_CallFunction(callable, "(I)", target));
 
                 if (result.get() == NULL) {
@@ -1127,7 +1127,7 @@ void __cdecl invokeCpuReset()
 
 int testInjections(u32 pc)
 {
-    return ((brk::items.find(pc) == brk::items.end()) ? 0 : 4) | (rbrk::items.empty() ? 0 : 1) | (wbrk::items.empty() ? 0 : 2);
+    return ((brk::items.lower_bound(pc) == brk::items.end()) ? 0 : 4) | (rbrk::items.empty() ? 0 : 1) | (wbrk::items.empty() ? 0 : 2);
 }
 
 } // namespace execmon

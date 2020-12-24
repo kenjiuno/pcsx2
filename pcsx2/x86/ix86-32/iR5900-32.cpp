@@ -1291,7 +1291,7 @@ void recompileNextInstruction(int delayslot)
 	cpuRegs.code = *(int *)s_pCode;
 
     // kkdf2--
-    bool execmonInjected = false;
+    u32 execmonInjected = 0;
     static u8 execmonEaten = 0;
     {
         bool branchOp = false;
