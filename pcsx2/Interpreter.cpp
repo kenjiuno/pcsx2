@@ -28,16 +28,15 @@
 #include <float.h>
 
 // kkdf2--
-#include "Haxkh2fm.h"
-#include "mypy.h"
+#include "execmon/execmon.h"
 // --kkdf2
 
-using namespace R5900;		// for OPCODE and OpcodeImpl
+using namespace R5900; // for OPCODE and OpcodeImpl
 
 extern int vu0branch, vu1branch;
 
 static int branch2 = 0;
-static u32 cpuBlockCycles = 0;		// 3 bit fixed point version of cycle count
+static u32 cpuBlockCycles = 0; // 3 bit fixed point version of cycle count
 static std::string disOut;
 
 static void intEventTest();
@@ -46,119 +45,118 @@ static void intEventTest();
 
 static void debugI()
 {
-	if( !IsDevBuild ) return;
-	if( cpuRegs.GPR.n.r0.UD[0] || cpuRegs.GPR.n.r0.UD[1] ) Console.Error("R0 is not zero!!!!");
+    if (!IsDevBuild)
+        return;
+    if (cpuRegs.GPR.n.r0.UD[0] || cpuRegs.GPR.n.r0.UD[1])
+        Console.Error("R0 is not zero!!!!");
 }
 
 
 void intBreakpoint(bool memcheck)
 {
-	u32 pc = cpuRegs.pc;
- 	if (CBreakPoints::CheckSkipFirst(pc) != 0)
-		return;
+    u32 pc = cpuRegs.pc;
+    if (CBreakPoints::CheckSkipFirst(pc) != 0)
+        return;
 
-	if (!memcheck)
-	{
-		auto cond = CBreakPoints::GetBreakPointCondition(pc);
-		if (cond && !cond->Evaluate())
-			return;
-	}
+    if (!memcheck) {
+        auto cond = CBreakPoints::GetBreakPointCondition(pc);
+        if (cond && !cond->Evaluate())
+            return;
+    }
 
-	CBreakPoints::SetBreakpointTriggered(true);
-	GetCoreThread().PauseSelfDebug();
-	throw Exception::ExitCpuExecute();
+    CBreakPoints::SetBreakpointTriggered(true);
+    GetCoreThread().PauseSelfDebug();
+    throw Exception::ExitCpuExecute();
 }
 
 void intMemcheck(u32 op, u32 bits, bool store)
 {
-	// compute accessed address
-	u32 start = cpuRegs.GPR.r[(op >> 21) & 0x1F].UD[0];
-	if ((s16)op != 0)
-		start += (s16)op;
-	if (bits == 128)
-		start &= ~0x0F;
+    // compute accessed address
+    u32 start = cpuRegs.GPR.r[(op >> 21) & 0x1F].UD[0];
+    if ((s16)op != 0)
+        start += (s16)op;
+    if (bits == 128)
+        start &= ~0x0F;
 
-	start = standardizeBreakpointAddress(start);
-	u32 end = start + bits/8;
-	
-	auto checks = CBreakPoints::GetMemChecks();
-	for (size_t i = 0; i < checks.size(); i++)
-	{
-		auto& check = checks[i];
+    start = standardizeBreakpointAddress(start);
+    u32 end = start + bits / 8;
 
-		if (check.result == 0)
-			continue;
-		if ((check.cond & MEMCHECK_WRITE) == 0 && store)
-			continue;
-		if ((check.cond & MEMCHECK_READ) == 0 && !store)
-			continue;
+    auto checks = CBreakPoints::GetMemChecks();
+    for (size_t i = 0; i < checks.size(); i++) {
+        auto &check = checks[i];
 
-		if (start < check.end && check.start < end)
-			intBreakpoint(true);
-	}
+        if (check.result == 0)
+            continue;
+        if ((check.cond & MEMCHECK_WRITE) == 0 && store)
+            continue;
+        if ((check.cond & MEMCHECK_READ) == 0 && !store)
+            continue;
+
+        if (start < check.end && check.start < end)
+            intBreakpoint(true);
+    }
 }
 
 void intCheckMemcheck()
 {
-	u32 pc = cpuRegs.pc;
-	int needed = isMemcheckNeeded(pc);
-	if (needed == 0)
-		return;
+    u32 pc = cpuRegs.pc;
+    int needed = isMemcheckNeeded(pc);
+    if (needed == 0)
+        return;
 
-	u32 op = memRead32(needed == 2 ? pc+4 : pc);
-	const OPCODE& opcode = GetInstruction(op);
+    u32 op = memRead32(needed == 2 ? pc + 4 : pc);
+    const OPCODE &opcode = GetInstruction(op);
 
-	bool store = (opcode.flags & IS_STORE) != 0;
-	switch (opcode.flags & MEMTYPE_MASK)
-	{
-	case MEMTYPE_BYTE:
-		intMemcheck(op,8,store);
-		break;
-	case MEMTYPE_HALF:
-		intMemcheck(op,16,store);
-		break;
-	case MEMTYPE_WORD:
-		intMemcheck(op,32,store);
-		break;
-	case MEMTYPE_DWORD:
-		intMemcheck(op,64,store);
-		break;
-	case MEMTYPE_QWORD:
-		intMemcheck(op,128,store);
-		break;
-	}
+    bool store = (opcode.flags & IS_STORE) != 0;
+    switch (opcode.flags & MEMTYPE_MASK) {
+        case MEMTYPE_BYTE:
+            intMemcheck(op, 8, store);
+            break;
+        case MEMTYPE_HALF:
+            intMemcheck(op, 16, store);
+            break;
+        case MEMTYPE_WORD:
+            intMemcheck(op, 32, store);
+            break;
+        case MEMTYPE_DWORD:
+            intMemcheck(op, 64, store);
+            break;
+        case MEMTYPE_QWORD:
+            intMemcheck(op, 128, store);
+            break;
+    }
 }
 
 static void execI()
 {
-	// execI is called for every instruction so it must remains as light as possible.
-	// If you enable the next define, Interpreter will be much slower (around
-	// ~4fps on 3.9GHz Haswell vs ~8fps (even 10fps on dev build))
-	// Extra note: due to some cycle count issue PCSX2's internal debugger is
-	// not yet usable with the interpreter
+    // execI is called for every instruction so it must remains as light as possible.
+    // If you enable the next define, Interpreter will be much slower (around
+    // ~4fps on 3.9GHz Haswell vs ~8fps (even 10fps on dev build))
+    // Extra note: due to some cycle count issue PCSX2's internal debugger is
+    // not yet usable with the interpreter
 //#define EXTRA_DEBUG
 #ifdef EXTRA_DEBUG
-	// check if any breakpoints or memchecks are triggered by this instruction
-	if (isBreakpointNeeded(cpuRegs.pc))
-		intBreakpoint(false);
+    // check if any breakpoints or memchecks are triggered by this instruction
+    if (isBreakpointNeeded(cpuRegs.pc))
+        intBreakpoint(false);
 
-	intCheckMemcheck();
+    intCheckMemcheck();
 #endif
 
-	u32 pc = cpuRegs.pc;
-	// We need to increase the pc before executing the memRead32. An exception could appears
-	// and it expects the PC counter to be pre-incremented
-	cpuRegs.pc += 4;
+    u32 pc = cpuRegs.pc;
+    // We need to increase the pc before executing the memRead32. An exception could appears
+    // and it expects the PC counter to be pre-incremented
+    cpuRegs.pc += 4;
 
-	// interprete instruction
-	cpuRegs.code = memRead32( pc );
-	// Honestly I think this code is useless nowadays.
+    // interprete instruction
+    cpuRegs.code = memRead32(pc);
+    // Honestly I think this code is useless nowadays.
 #ifdef EXTRA_DEBUG
-	if( IsDebugBuild )
-		debugI();
+    if (IsDebugBuild)
+        debugI();
 #endif
 
-	const OPCODE& opcode = GetCurrentInstruction();
+    const OPCODE &opcode = GetCurrentInstruction();
 #if 0
 	static long int runs = 0;
 	//use this to find out what opcodes your game uses. very slow! (rama)
@@ -186,12 +184,10 @@ static void execI()
 	}
 #endif
 
-	// kkdf2--
-	{
+    // kkdf2--
+    {
         bool loadOp = false;
         bool storeOp = false;
-        const bool traceRead = 0 != (1 & s_mypy_rwTrace);
-        const bool traceWrite = 0 != (2 & s_mypy_rwTrace);
         {
             switch (_Opcode_) {
                 case 0x1A: //LDL
@@ -206,7 +202,7 @@ static void execI()
                 case 0x26: //LWR
                 case 0x27: //LWU
                 case 0x31: //LWC1
-				case 0x36: //LQC2
+                case 0x36: //LQC2
                 case 0x37: //LD
                     loadOp = true;
                     break;
@@ -219,102 +215,85 @@ static void execI()
                 case 0x2D: //SDR
                 case 0x2E: //SWR
                 case 0x39: //SWC1
-				case 0x3E: //SQC2
-				case 0x3F: //SD
+                case 0x3E: //SQC2
+                case 0x3F: //SD
                     storeOp = true;
                     break;
             }
         }
 
-		s_mypyEat = 0;
+        execmon::exitstatus::clear();
+        execmon::currentPc = pc;
 
-		s_mypy_pc = pc;
+        execmon::brk::invoke();
 
-		for (int x = 0; x < MAX_BRK && s_mypyBrk[x].pc != 0; x++) {
-			MypyBrk &r = s_mypyBrk[x];
-			if (r.pc == pc && r.pyCb != NULL) {
-				s_mypyHitBrk = x;
-				s_mypyEat |= MypyHitBrk();
-			}
-		}
-
-		if (loadOp) {
-            s_mypyEat |= MypyTestRBrk();
-            if (traceRead) {
-                mypyRecordRW(1);
-			}
-		}
+        if (loadOp) {
+            execmon::encounterLoadOp();
+        }
         if (storeOp) {
-            s_mypyEat |= MypyTestWBrk();
-            if (traceWrite) {
-                mypyRecordRW(2);
-            }
+            execmon::encounterStoreOp();
         }
 
-		if (s_mypyEat & 2) {
-            cpuRegs.pc = s_mypy_new_pc;
+        int eaten = execmon::exitstatus::eject();
+        if (eaten & execmon::exitstatus::Deorbit) {
+            cpuRegs.pc = execmon::exitstatus::s_mypy_new_pc;
             return;
         }
-	}
-	// --kkdf2
-
-	cpuBlockCycles += opcode.cycles;
-
-	opcode.interpret();
-
-	// kkdf2--
-	{
-        if (s_feet != NULL) {
-            if (!MypyWriteEETrace(0)) {
-                fclose(s_feet);
-                s_feet = NULL;
-            }
-        }
-
-        s_mypy_opc = pc;
     }
-	// --kkdf2
+    // --kkdf2
+
+    cpuBlockCycles += opcode.cycles;
+
+    opcode.interpret();
+
+    // kkdf2--
+    {
+        if (!execmon::eetrace.MypyWriteEETrace(0)) {
+            execmon::eetrace.close();
+		}
+
+        execmon::s_mypy_opc = pc;
+    }
+    // --kkdf2
 }
 
 static __fi void _doBranch_shared(u32 tar)
 {
-	branch2 = cpuRegs.branch = 1;
-	execI();
+    branch2 = cpuRegs.branch = 1;
+    execI();
 
-	// branch being 0 means an exception was thrown, since only the exception
-	// handler should ever clear it.
+    // branch being 0 means an exception was thrown, since only the exception
+    // handler should ever clear it.
 
-	if( cpuRegs.branch != 0 )
-	{
-		cpuRegs.pc = tar;
-		cpuRegs.branch = 0;
-	}
+    if (cpuRegs.branch != 0) {
+        cpuRegs.pc = tar;
+        cpuRegs.branch = 0;
+    }
 }
 
-static void __fastcall doBranch( u32 target )
+static void __fastcall doBranch(u32 target)
 {
-	_doBranch_shared( target );
-	cpuRegs.cycle += cpuBlockCycles >> 3;
-	cpuBlockCycles &= (1<<3)-1;
-	intEventTest();
+    _doBranch_shared(target);
+    cpuRegs.cycle += cpuBlockCycles >> 3;
+    cpuBlockCycles &= (1 << 3) - 1;
+    intEventTest();
 }
 
 void __fastcall intDoBranch(u32 target)
 {
-	//Console.WriteLn("Interpreter Branch ");
-	_doBranch_shared( target );
+    //Console.WriteLn("Interpreter Branch ");
+    _doBranch_shared(target);
 
-	if( Cpu == &intCpu )
-	{
-		cpuRegs.cycle += cpuBlockCycles >> 3;
-		cpuBlockCycles &= (1<<3)-1;
-		intEventTest();
-	}
+    if (Cpu == &intCpu) {
+        cpuRegs.cycle += cpuBlockCycles >> 3;
+        cpuBlockCycles &= (1 << 3) - 1;
+        intEventTest();
+    }
 }
 
 void intSetBranch()
 {
-	branch2 = /*cpuRegs.branch =*/ 1;
+    branch2 = /*cpuRegs.branch =*/1;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -325,9 +304,12 @@ void intSetBranch()
 // necessary branch test logic that the recs need to maintain sync with the
 // cpuRegs.pc and delaySlot instruction and such.
 
-namespace R5900 {
-namespace Interpreter {
-namespace OpcodeImpl {
+namespace R5900
+{
+namespace Interpreter
+{
+namespace OpcodeImpl
+{
 
 /*********************************************************
 * Jump to target                                         *
@@ -338,18 +320,18 @@ namespace OpcodeImpl {
 
 void J()
 {
-	doBranch(_JumpTarget_);
+    doBranch(_JumpTarget_);
 }
 
 void JAL()
 {
-	// 0x3563b8 is the start address of the function that invalidate entry in TLB cache
-	if (EmuConfig.Gamefixes.GoemonTlbHack) {
-		if (_JumpTarget_ == 0x3563b8)
-			GoemonUnloadTlb(cpuRegs.GPR.n.a0.UL[0]);
-	}
-	_SetLink(31);
-	doBranch(_JumpTarget_);
+    // 0x3563b8 is the start address of the function that invalidate entry in TLB cache
+    if (EmuConfig.Gamefixes.GoemonTlbHack) {
+        if (_JumpTarget_ == 0x3563b8)
+            GoemonUnloadTlb(cpuRegs.GPR.n.a0.UL[0]);
+    }
+    _SetLink(31);
+    doBranch(_JumpTarget_);
 }
 
 /*********************************************************
@@ -357,20 +339,20 @@ void JAL()
 * Format:  OP rs, rt, offset                             *
 *********************************************************/
 
-void BEQ()  // Branch if Rs == Rt
+void BEQ() // Branch if Rs == Rt
 {
-	if (cpuRegs.GPR.r[_Rs_].SD[0] == cpuRegs.GPR.r[_Rt_].SD[0])
-		doBranch(_BranchTarget_);
-	else
-		intEventTest();
+    if (cpuRegs.GPR.r[_Rs_].SD[0] == cpuRegs.GPR.r[_Rt_].SD[0])
+        doBranch(_BranchTarget_);
+    else
+        intEventTest();
 }
 
-void BNE()  // Branch if Rs != Rt
+void BNE() // Branch if Rs != Rt
 {
-	if (cpuRegs.GPR.r[_Rs_].SD[0] != cpuRegs.GPR.r[_Rt_].SD[0])
-		doBranch(_BranchTarget_);
-	else
-		intEventTest();
+    if (cpuRegs.GPR.r[_Rs_].SD[0] != cpuRegs.GPR.r[_Rt_].SD[0])
+        doBranch(_BranchTarget_);
+    else
+        intEventTest();
 }
 
 /*********************************************************
@@ -378,54 +360,48 @@ void BNE()  // Branch if Rs != Rt
 * Format:  OP rs, offset                                 *
 *********************************************************/
 
-void BGEZ()    // Branch if Rs >= 0
+void BGEZ() // Branch if Rs >= 0
 {
-	if(cpuRegs.GPR.r[_Rs_].SD[0] >= 0)
-	{
-		doBranch(_BranchTarget_);
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] >= 0) {
+        doBranch(_BranchTarget_);
+    }
 }
 
 void BGEZAL() // Branch if Rs >= 0 and link
 {
-	_SetLink(31);
-	if (cpuRegs.GPR.r[_Rs_].SD[0] >= 0)
-	{
-		doBranch(_BranchTarget_);
-	}
+    _SetLink(31);
+    if (cpuRegs.GPR.r[_Rs_].SD[0] >= 0) {
+        doBranch(_BranchTarget_);
+    }
 }
 
-void BGTZ()    // Branch if Rs >  0
+void BGTZ() // Branch if Rs >  0
 {
-	if (cpuRegs.GPR.r[_Rs_].SD[0] > 0)
-	{
-		doBranch(_BranchTarget_);
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] > 0) {
+        doBranch(_BranchTarget_);
+    }
 }
 
-void BLEZ()   // Branch if Rs <= 0
+void BLEZ() // Branch if Rs <= 0
 {
-	if (cpuRegs.GPR.r[_Rs_].SD[0] <= 0)
-	{
-		doBranch(_BranchTarget_);
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] <= 0) {
+        doBranch(_BranchTarget_);
+    }
 }
 
-void BLTZ()    // Branch if Rs <  0
+void BLTZ() // Branch if Rs <  0
 {
-	if (cpuRegs.GPR.r[_Rs_].SD[0] < 0)
-	{
-		doBranch(_BranchTarget_);
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] < 0) {
+        doBranch(_BranchTarget_);
+    }
 }
 
-void BLTZAL()  // Branch if Rs <  0 and link
+void BLTZAL() // Branch if Rs <  0 and link
 {
-	_SetLink(31);
-	if (cpuRegs.GPR.r[_Rs_].SD[0] < 0)
-	{
-		doBranch(_BranchTarget_);
-	}
+    _SetLink(31);
+    if (cpuRegs.GPR.r[_Rs_].SD[0] < 0) {
+        doBranch(_BranchTarget_);
+    }
 }
 
 /*********************************************************
@@ -434,110 +410,86 @@ void BLTZAL()  // Branch if Rs <  0 and link
 *********************************************************/
 
 
-void BEQL()    // Branch if Rs == Rt
+void BEQL() // Branch if Rs == Rt
 {
-	if(cpuRegs.GPR.r[_Rs_].SD[0] == cpuRegs.GPR.r[_Rt_].SD[0])
-	{
-		doBranch(_BranchTarget_);
-	}
-	else
-	{
-		cpuRegs.pc +=4;
-		intEventTest();
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] == cpuRegs.GPR.r[_Rt_].SD[0]) {
+        doBranch(_BranchTarget_);
+    } else {
+        cpuRegs.pc += 4;
+        intEventTest();
+    }
 }
 
-void BNEL()     // Branch if Rs != Rt
+void BNEL() // Branch if Rs != Rt
 {
-	if(cpuRegs.GPR.r[_Rs_].SD[0] != cpuRegs.GPR.r[_Rt_].SD[0])
-	{
-		doBranch(_BranchTarget_);
-	}
-	else
-	{
-		cpuRegs.pc +=4;
-		intEventTest();
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] != cpuRegs.GPR.r[_Rt_].SD[0]) {
+        doBranch(_BranchTarget_);
+    } else {
+        cpuRegs.pc += 4;
+        intEventTest();
+    }
 }
 
-void BLEZL()    // Branch if Rs <= 0
+void BLEZL() // Branch if Rs <= 0
 {
-	if(cpuRegs.GPR.r[_Rs_].SD[0] <= 0)
-	{
-		doBranch(_BranchTarget_);
-	}
-	else
-	{
-		cpuRegs.pc +=4;
-		intEventTest();
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] <= 0) {
+        doBranch(_BranchTarget_);
+    } else {
+        cpuRegs.pc += 4;
+        intEventTest();
+    }
 }
 
-void BGTZL()     // Branch if Rs >  0
+void BGTZL() // Branch if Rs >  0
 {
-	if(cpuRegs.GPR.r[_Rs_].SD[0] > 0)
-	{
-		doBranch(_BranchTarget_);
-	}
-	else
-	{
-		cpuRegs.pc +=4;
-		intEventTest();
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] > 0) {
+        doBranch(_BranchTarget_);
+    } else {
+        cpuRegs.pc += 4;
+        intEventTest();
+    }
 }
 
-void BLTZL()     // Branch if Rs <  0
+void BLTZL() // Branch if Rs <  0
 {
-	if(cpuRegs.GPR.r[_Rs_].SD[0] < 0)
-	{
-		doBranch(_BranchTarget_);
-	}
-	else
-	{
-		cpuRegs.pc +=4;
-		intEventTest();
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] < 0) {
+        doBranch(_BranchTarget_);
+    } else {
+        cpuRegs.pc += 4;
+        intEventTest();
+    }
 }
 
-void BGEZL()     // Branch if Rs >= 0
+void BGEZL() // Branch if Rs >= 0
 {
-	if(cpuRegs.GPR.r[_Rs_].SD[0] >= 0)
-	{
-		doBranch(_BranchTarget_);
-	}
-	else
-	{
-		cpuRegs.pc +=4;
-		intEventTest();
-	}
+    if (cpuRegs.GPR.r[_Rs_].SD[0] >= 0) {
+        doBranch(_BranchTarget_);
+    } else {
+        cpuRegs.pc += 4;
+        intEventTest();
+    }
 }
 
-void BLTZALL()   // Branch if Rs <  0 and link
+void BLTZALL() // Branch if Rs <  0 and link
 {
-	_SetLink(31);
-	if(cpuRegs.GPR.r[_Rs_].SD[0] < 0)
-	{
-		doBranch(_BranchTarget_);
-	}
-	else
-	{
-		cpuRegs.pc +=4;
-		intEventTest();
-	}
+    _SetLink(31);
+    if (cpuRegs.GPR.r[_Rs_].SD[0] < 0) {
+        doBranch(_BranchTarget_);
+    } else {
+        cpuRegs.pc += 4;
+        intEventTest();
+    }
 }
 
-void BGEZALL()   // Branch if Rs >= 0 and link
+void BGEZALL() // Branch if Rs >= 0 and link
 {
-	_SetLink(31);
-	if(cpuRegs.GPR.r[_Rs_].SD[0] >= 0)
-	{
-		doBranch(_BranchTarget_);
-	}
-	else
-	{
-		cpuRegs.pc +=4;
-		intEventTest();
-	}
+    _SetLink(31);
+    if (cpuRegs.GPR.r[_Rs_].SD[0] >= 0) {
+        doBranch(_BranchTarget_);
+    } else {
+        cpuRegs.pc += 4;
+        intEventTest();
+    }
 }
 
 /*********************************************************
@@ -546,25 +498,28 @@ void BGEZALL()   // Branch if Rs >= 0 and link
 *********************************************************/
 void JR()
 {
-	// 0x33ad48 and 0x35060c are the return address of the function (0x356250) that populate the TLB cache
-	if (EmuConfig.Gamefixes.GoemonTlbHack) {
-		u32 add = cpuRegs.GPR.r[_Rs_].UL[0];
-		if (add == 0x33ad48 || add == 0x35060c)
-			GoemonPreloadTlb();
-	}
-	doBranch(cpuRegs.GPR.r[_Rs_].UL[0]);
+    // 0x33ad48 and 0x35060c are the return address of the function (0x356250) that populate the TLB cache
+    if (EmuConfig.Gamefixes.GoemonTlbHack) {
+        u32 add = cpuRegs.GPR.r[_Rs_].UL[0];
+        if (add == 0x33ad48 || add == 0x35060c)
+            GoemonPreloadTlb();
+    }
+    doBranch(cpuRegs.GPR.r[_Rs_].UL[0]);
 }
 
 void JALR()
 {
-	u32 temp = cpuRegs.GPR.r[_Rs_].UL[0];
+    u32 temp = cpuRegs.GPR.r[_Rs_].UL[0];
 
-	if (_Rd_)  _SetLink(_Rd_);
+    if (_Rd_)
+        _SetLink(_Rd_);
 
-	doBranch(temp);
+    doBranch(temp);
 }
 
-} } }		// end namespace R5900::Interpreter::OpcodeImpl
+} // namespace OpcodeImpl
+} // namespace Interpreter
+} // namespace R5900
 
 
 // --------------------------------------------------------------------------------------
@@ -573,153 +528,150 @@ void JALR()
 
 static void intReserve()
 {
-	// fixme : detect cpu for use the optimize asm code
+    // fixme : detect cpu for use the optimize asm code
 }
 
 static void intAlloc()
 {
-	// Nothing to do!
+    // Nothing to do!
 }
 
 static void intReset()
 {
-	cpuRegs.branch = 0;
-	branch2 = 0;
+    cpuRegs.branch = 0;
+    branch2 = 0;
 }
 
 static void intEventTest()
 {
-	// Perform counters, ints, and IOP updates:
-	_cpuEventTest_Shared();
+    // Perform counters, ints, and IOP updates:
+    _cpuEventTest_Shared();
 }
 
 static void intExecute()
 {
-	bool instruction_was_cancelled;
-	enum ExecuteState {
-		RESET,
-		GAME_LOADING,
-		GAME_RUNNING
-	};
-	ExecuteState state = RESET;
-	do {
-		instruction_was_cancelled = false;
-		try {
-			// The execution was splited in three parts so it is easier to
-			// resume it after a cancelled instruction.
-			switch (state) {
-				case RESET:
-					do
-						execI();
-					while (cpuRegs.pc != (g_eeloadMain ? g_eeloadMain : EELOAD_START));
-					if (cpuRegs.pc == EELOAD_START)
-					{
-						// The EELOAD _start function is the same across all BIOS versions afaik
-						u32 mainjump = memRead32(EELOAD_START + 0x9c);
-						if (mainjump >> 26 == 3) // JAL
-							g_eeloadMain = ((EELOAD_START + 0xa0) & 0xf0000000U) | (mainjump << 2 & 0x0fffffffU);
-					}
-					else if (cpuRegs.pc == g_eeloadMain)
-					{
-						eeloadHook();
-						if (g_SkipBiosHack)
-						{
-							// See comments on this code in iR5900-32.cpp's recRecompile()
-							u32 typeAexecjump = memRead32(EELOAD_START + 0x470);
-							u32 typeBexecjump = memRead32(EELOAD_START + 0x5B0);
-							u32 typeCexecjump = memRead32(EELOAD_START + 0x618);
-							u32 typeDexecjump = memRead32(EELOAD_START + 0x600);
-							if ((typeBexecjump >> 26 == 3) || (typeCexecjump >> 26 == 3) || (typeDexecjump >> 26 == 3)) // JAL to 0x822B8
-								g_eeloadExec = EELOAD_START + 0x2B8;
-							else if (typeAexecjump >> 26 == 3) // JAL to 0x82170
-								g_eeloadExec = EELOAD_START + 0x170;
-							else
-								Console.WriteLn("intExecute: Could not enable launch arguments for fast boot mode; unidentified BIOS version! Please report this to the PCSX2 developers.");
-						}
-					}
-					else if (cpuRegs.pc == g_eeloadExec)
-						eeloadHook2();
+    bool instruction_was_cancelled;
+    enum ExecuteState {
+        RESET,
+        GAME_LOADING,
+        GAME_RUNNING
+    };
+    ExecuteState state = RESET;
+    do {
+        instruction_was_cancelled = false;
+        try {
+            // The execution was splited in three parts so it is easier to
+            // resume it after a cancelled instruction.
+            switch (state) {
+                case RESET:
+                    do
+                        execI();
+                    while (cpuRegs.pc != (g_eeloadMain ? g_eeloadMain : EELOAD_START));
+                    if (cpuRegs.pc == EELOAD_START) {
+                        // The EELOAD _start function is the same across all BIOS versions afaik
+                        u32 mainjump = memRead32(EELOAD_START + 0x9c);
+                        if (mainjump >> 26 == 3) // JAL
+                            g_eeloadMain = ((EELOAD_START + 0xa0) & 0xf0000000U) | (mainjump << 2 & 0x0fffffffU);
+                    } else if (cpuRegs.pc == g_eeloadMain) {
+                        eeloadHook();
+                        if (g_SkipBiosHack) {
+                            // See comments on this code in iR5900-32.cpp's recRecompile()
+                            u32 typeAexecjump = memRead32(EELOAD_START + 0x470);
+                            u32 typeBexecjump = memRead32(EELOAD_START + 0x5B0);
+                            u32 typeCexecjump = memRead32(EELOAD_START + 0x618);
+                            u32 typeDexecjump = memRead32(EELOAD_START + 0x600);
+                            if ((typeBexecjump >> 26 == 3) || (typeCexecjump >> 26 == 3) || (typeDexecjump >> 26 == 3)) // JAL to 0x822B8
+                                g_eeloadExec = EELOAD_START + 0x2B8;
+                            else if (typeAexecjump >> 26 == 3) // JAL to 0x82170
+                                g_eeloadExec = EELOAD_START + 0x170;
+                            else
+                                Console.WriteLn("intExecute: Could not enable launch arguments for fast boot mode; unidentified BIOS version! Please report this to the PCSX2 developers.");
+                        }
+                    } else if (cpuRegs.pc == g_eeloadExec)
+                        eeloadHook2();
 
-					if (g_GameLoading)
-						state = GAME_LOADING;
-					else
-						break;
+                    if (g_GameLoading)
+                        state = GAME_LOADING;
+                    else
+                        break;
 
-				case GAME_LOADING:
-					if (ElfEntry != 0xFFFFFFFF) {
-						do
-							execI();
-						while (cpuRegs.pc != ElfEntry);
-						eeGameStarting();
-					}
-					state = GAME_RUNNING;
+                case GAME_LOADING:
+                    if (ElfEntry != 0xFFFFFFFF) {
+                        do
+                            execI();
+                        while (cpuRegs.pc != ElfEntry);
+                        eeGameStarting();
+                    }
+                    state = GAME_RUNNING;
 
-				case GAME_RUNNING:
-					while (true)
-						execI();
-			}
-		}
-		catch( Exception::ExitCpuExecute& ) { }
-		catch( Exception::CancelInstruction& ) { instruction_was_cancelled = true; }
+                case GAME_RUNNING:
+                    while (true)
+                        execI();
+            }
+        } catch (Exception::ExitCpuExecute &) {
+        } catch (Exception::CancelInstruction &) {
+            instruction_was_cancelled = true;
+        }
 
-		// For example a tlb miss will throw an exception. Cpu must be resumed
-		// to execute the handler
-	} while (instruction_was_cancelled);
+        // For example a tlb miss will throw an exception. Cpu must be resumed
+        // to execute the handler
+    } while (instruction_was_cancelled);
 }
 
 static void intCheckExecutionState()
 {
-	if( GetCoreThread().HasPendingStateChangeRequest() )
-		throw Exception::ExitCpuExecute();
+    if (GetCoreThread().HasPendingStateChangeRequest())
+        throw Exception::ExitCpuExecute();
 }
 
 static void intStep()
 {
-	execI();
+    execI();
 }
 
 static void intClear(u32 Addr, u32 Size)
 {
 }
 
-static void intShutdown() {
-}
-
-static void intThrowException( const BaseR5900Exception& ex )
+static void intShutdown()
 {
-	// No tricks needed; C++ stack unwnding should suffice for MSW and GCC alike.
-	ex.Rethrow();
 }
 
-static void intThrowException( const BaseException& ex )
+static void intThrowException(const BaseR5900Exception &ex)
 {
-	// No tricks needed; C++ stack unwnding should suffice for MSW and GCC alike.
-	ex.Rethrow();
+    // No tricks needed; C++ stack unwnding should suffice for MSW and GCC alike.
+    ex.Rethrow();
 }
 
-static void intSetCacheReserve( uint reserveInMegs )
+static void intThrowException(const BaseException &ex)
+{
+    // No tricks needed; C++ stack unwnding should suffice for MSW and GCC alike.
+    ex.Rethrow();
+}
+
+static void intSetCacheReserve(uint reserveInMegs)
 {
 }
 
 static uint intGetCacheReserve()
 {
-	return 0;
+    return 0;
 }
 
 R5900cpu intCpu =
-{
-	intReserve,
-	intShutdown,
+    {
+        intReserve,
+        intShutdown,
 
-	intReset,
-	intStep,
-	intExecute,
+        intReset,
+        intStep,
+        intExecute,
 
-	intCheckExecutionState,
-	intThrowException,
-	intThrowException,
-	intClear,
+        intCheckExecutionState,
+        intThrowException,
+        intThrowException,
+        intClear,
 
-	intGetCacheReserve,
-	intSetCacheReserve,
+        intGetCacheReserve,
+        intSetCacheReserve,
 };

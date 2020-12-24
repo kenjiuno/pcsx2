@@ -154,8 +154,8 @@
     <Filter Include="Recording\gui">
       <UniqueIdentifier>{93e36831-627f-4529-b709-1f4bad398512}</UniqueIdentifier>
     </Filter>
-    <Filter Include="PyMon">
-      <UniqueIdentifier>{3d9a1089-ef24-4c9f-bf98-bdd68e653237}</UniqueIdentifier>
+    <Filter Include="execmon">
+      <UniqueIdentifier>{a62bc62e-2985-4e13-aeb7-1689bc78e0bb}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -892,14 +892,8 @@
     <ClCompile Include="..\..\Recording\VirtualPad.cpp">
       <Filter>Recording\gui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\Haxkh2fm.cpp">
-      <Filter>PyMon</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\EEDisarm.cpp">
-      <Filter>PyMon</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\mypy.cpp">
-      <Filter>PyMon</Filter>
+    <ClCompile Include="..\..\execmon\execmon.cpp">
+      <Filter>execmon</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1362,14 +1356,8 @@
     <ClInclude Include="..\..\Recording\VirtualPad.h">
       <Filter>Recording\gui</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Haxkh2fm.h">
-      <Filter>PyMon</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\EEDisarm.h">
-      <Filter>PyMon</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\mypy.h">
-      <Filter>PyMon</Filter>
+    <ClInclude Include="..\..\execmon\execmon.h">
+      <Filter>execmon</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

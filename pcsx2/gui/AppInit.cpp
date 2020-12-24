@@ -36,7 +36,7 @@
 #include <memory>
 
 // kkdf2--
-#include "mypy.h"
+#include "execmon/execmon.h"
 // --kkdf2
 
 using namespace pxSizerFlags;
@@ -519,7 +519,7 @@ bool Pcsx2App::OnInit()
 		if( m_UseGUI ) OpenMainFrame();
 
 		// kkdf2--
-		MypyInit();
+		execmon::py::init();
 		// --kkdf2
 
 
@@ -680,7 +680,7 @@ void Pcsx2App::CleanupOnExit()
 	Console_SetActiveHandler( ConsoleWriter_Stdout );
 
 	// kkdf2--
-	MypyFinalize();
+    execmon::py::finalize();
 	// --kdf2
 }
 

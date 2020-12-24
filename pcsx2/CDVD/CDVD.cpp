@@ -32,7 +32,7 @@
 #include "GameDatabase.h"
 
 // kkdf2--
-#include "mypy.h"
+#include "execmon/execmon.h"
 // --kkdf2
 
 // This typically reflects the Sony-assigned serial code for the Disc, if one exists.
@@ -382,7 +382,7 @@ static __fi void _reloadElfInfo(wxString elfpath)
     // binary).
 
     // kkdf2--
-    MypyElfLoaded();
+    execmon::py::elfLoaded();
     // --kkdf2
 }
 

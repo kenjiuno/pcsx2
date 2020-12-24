@@ -34,7 +34,7 @@
 #include "Sio.h"
 
 // kkdf2--
-#include "mypy.h"
+#include "execmon/execmon.h"
 // --kkdf2
 
 __aligned16 SysMtgsThread mtgsThread;
@@ -140,8 +140,8 @@ ExecutorThread& GetSysExecutorThread()
 static void _Suspend()
 {
 	// kkdf2--
-	MypyOnSuspend();
-	// --kkdf2
+    execmon::py::movetoSuspend();
+    // --kkdf2
 
     GetCoreThread().Suspend(true);
 }
@@ -169,8 +169,8 @@ void AppCoreThread::Resume()
 	}
 
 	// kkdf2--
-	MypyOnResume();
-	// --kkdf2
+    execmon::py::movetoResume();
+    // --kkdf2
 
 	GetCorePlugins().Init();
 	_parent::Resume();

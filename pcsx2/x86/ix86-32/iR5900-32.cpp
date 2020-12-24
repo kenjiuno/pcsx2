@@ -45,8 +45,7 @@
 
 
 // kkdf2--
-#include "Haxkh2fm.h"
-#include "mypy.h"
+#include "execmon/execmon.h"
 // --kkdf2
 
 using namespace x86Emitter;
@@ -1292,13 +1291,12 @@ void recompileNextInstruction(int delayslot)
 	cpuRegs.code = *(int *)s_pCode;
 
     // kkdf2--
-    bool eatSet = false;
+    bool execmonInjected = false;
+    static u8 execmonEaten = 0;
     {
         bool branchOp = false;
         bool loadOp = false;
         bool storeOp = false;
-        const bool traceRead = 0 != (1 & s_mypy_rwTrace);
-        const bool traceWrite = 0 != (2 & s_mypy_rwTrace);
         switch (_Opcode_) {
             case 0x01: //REGIMM
                 switch (_Rt_) {
@@ -1356,93 +1354,26 @@ void recompileNextInstruction(int delayslot)
                 break;
         }
 
-        bool useEat = false;
-        for (int x = 0; x < MAX_BRK; x++) {
-            if (pc == s_mypyBrk[x].pc || s_mypyRBrk[x].len != 0 || s_mypyWBrk[x].len != 0) {
-                useEat = true;
-                break;
-            }
-        }
+		execmonInjected = execmon::testAnyInjection();
 
-        bool useRBrk = false; // very slow
-        if (loadOp) {
-            for (int x = 0; x < MAX_BRK; x++) {
-                if (s_mypyRBrk[x].len != 0) { // any break point set?
-                    useRBrk = true;
-                    useEat = true;
-                    break;
-                }
+		if (execmonInjected) {
+            iFlushCall(FLUSH_EVERYTHING | FLUSH_CODE);
+            xMOV(ptr32[&execmon::currentPc], pc);
+            xCALL((void *)execmon::exitstatus::clear);
+            xCALL((void *)execmon::brk::invoke);
+            if (loadOp) {
+                xCALL((void *)execmon::encounterLoadOp);
             }
-        }
-
-        bool useWBrk = false; // very slow
-        if (storeOp) {
-            for (int x = 0; x < MAX_BRK; x++) {
-                if (s_mypyWBrk[x].len != 0) { // any break point set?
-                    useWBrk = true;
-                    useEat = true;
-                    break;
-                }
+            if (storeOp) {
+                xCALL((void *)execmon::encounterStoreOp);
             }
-        }
+            xCALL((void *)execmon::exitstatus::eject);
+            xMOV(ptr8[&execmonEaten], al);
 
-        if (useEat) {
-            iFlushCall(FLUSH_EVERYTHING);
-            xMOV(ptr32[&s_mypy_pc], pc);
-            if (!branchOp && !delayslot) {
-                xMOV(ptr32[&s_mypyEat], 0);
-            }
-        }
-
-        for (int x = 0; x < MAX_BRK; x++) {
-            if (pc == s_mypyBrk[x].pc) {
-                xMOV(ptr32[&s_mypyHitBrk], (branchOp ? 512 : 0) | 256 | x);
-                xCALL((void *)MypyHitBrk);
-                if (!branchOp && !delayslot) {
-                    xOR(ptr32[&s_mypyEat], eax);
-                    eatSet = true;
-                }
-            }
-        }
-
-        if (loadOp) {
-            if (useRBrk) {
-                iFlushCall(FLUSH_CODE);
-                xCALL((void *)MypyTestRBrk);
-                xOR(ptr32[&s_mypyEat], eax);
-                eatSet = true;
-            }
-            if (traceRead) {
-                iFlushCall(FLUSH_CODE);
-
-				xMOV(ptr32[&s_mypy_pc], pc);
-				xPUSH(1);
-                xCALL((void *)mypyRecordRW);
-                xADD(esp, 4);
-			}
-        }
-		else if (storeOp) {
-            if (useWBrk) {
-                iFlushCall(FLUSH_CODE);
-                xCALL((void *)MypyTestWBrk);
-                xOR(ptr32[&s_mypyEat], eax);
-                eatSet = true;
-            }
-            if (traceWrite) {
-                iFlushCall(FLUSH_CODE);
-
-				xMOV(ptr32[&s_mypy_pc], pc);
-				xPUSH(2);
-                xCALL((void *)mypyRecordRW);
-                xADD(esp, 4);
-            }
-        }
-
-        if (eatSet) {
-            xTEST(ptr8[&s_mypyEat], 2);
+		    xTEST(eax, execmon::exitstatus::Deorbit);
             j8Ptr[0] = JZ8(0);
             {
-                xMOV(eax, ptr32[&s_mypy_new_pc]);
+                xMOV(eax, ptr32[&execmon::exitstatus::s_mypy_new_pc]);
                 xMOV(ptr32[&cpuRegs.pc], eax);
                 xJMP((void *)DispatcherEvent);
             }
@@ -1536,13 +1467,13 @@ void recompileNextInstruction(int delayslot)
 //	g_cpuHasConstReg = 1;
 
     // kkdf2--
-    if (eatSet) {
-        xTEST(ptr8[&s_mypyEat], 1);
+    if (execmonInjected) {
+        xTEST(ptr8[&execmonEaten], execmon::exitstatus::resetCpu);
         j8Ptr[0] = JZ8(0);
         {
             xMOV(ptr32[&cpuRegs.pc], pc); // already +4
             xADD(ptr32[&cpuRegs.cycle], scaleblockcycles());
-			xCALL((void *)mypyResetCpu);
+			xCALL((void *)execmon::invokeCpuReset);
             xJMP((void *)DispatcherEvent);
         }
         x86SetJ8(j8Ptr[0]);
