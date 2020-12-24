@@ -35,10 +35,6 @@
 #include "Patch.h"
 #include "GameDatabase.h"
 
-// kkdf2--
-#include "mypy.h"
-// --kkdf2
-
 #include "../DebugTools/Breakpoints.h"
 #include "R5900OpcodeTables.h"
 

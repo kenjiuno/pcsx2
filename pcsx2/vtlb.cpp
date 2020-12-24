@@ -38,10 +38,6 @@
 
 #include "Utilities/MemsetFast.inl"
 
-// kkdf2--
-#include "mypy.h"
-// --kkdf2
-
 using namespace R5900;
 using namespace vtlb_private;
 
