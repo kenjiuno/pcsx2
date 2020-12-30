@@ -65,7 +65,7 @@ utils::UniquePyObject onFlushRWTrace;
 namespace brk
 {
 Items items;
-int add(u32 pc, PyObject *callable)
+int add(u32 pc, PyObject *callable, u32 flags)
 {
     pc &= ~3UL;
 
@@ -77,6 +77,7 @@ int add(u32 pc, PyObject *callable)
     iter->second.key = utils::keyGen.alloc();
     iter->second.callable.reset(callable);
     Py_XINCREF(callable);
+    iter->second.brkf = flags;
 
     return iter->second.key;
 }
@@ -100,7 +101,7 @@ bool remove(int key)
 namespace rbrk
 {
 brkCommon::Items items;
-int add(u32 addr, u32 size, PyObject *callable)
+int add(u32 addr, u32 size, PyObject *callable, u32 flags)
 {
     Items::iterator iter = items.insert(items.end(), Item());
     iter->key = utils::keyGen.alloc();
@@ -108,6 +109,7 @@ int add(u32 addr, u32 size, PyObject *callable)
     iter->size = size;
     iter->callable.reset(callable);
     Py_XINCREF(callable);
+    iter->brkf = flags;
 
     return iter->key;
 }
@@ -130,12 +132,13 @@ bool remove(int key)
 namespace wbrk
 {
 brkCommon::Items items;
-int add(u32 addr, u32 size, PyObject *callable)
+int add(u32 addr, u32 size, PyObject *callable, u32 flags)
 {
     Items::iterator iter = items.insert(items.end(), Item());
     iter->key = utils::keyGen.alloc();
     iter->callable.reset(callable);
     Py_XINCREF(callable);
+    iter->brkf = flags;
 
     return iter->key;
 }
@@ -336,6 +339,38 @@ bool EETrace::MypyWriteEETrace(int mask)
     return true;
 }
 
+
+struct
+{
+    u32 orFlags;
+    u32 andMask;
+
+    void update()
+    {
+        orFlags = 0;
+        andMask = (u32)-1;
+
+        brkCommon::Items::iterator iter;
+
+        for (iter = rbrk::items.begin(); iter != rbrk::items.end(); iter++) {
+            orFlags |= loadOpInterceptor;
+
+            if (!(iter->brkf & brkfReadOnly)) {
+                andMask &= ~(readOnlyDeclaration);
+            }
+        }
+
+        for (iter = wbrk::items.begin(); iter != wbrk::items.end(); iter++) {
+            orFlags |= storeOpInterceptor;
+
+            if (!(iter->brkf & brkfReadOnly)) {
+                andMask &= ~(readOnlyDeclaration);
+            }
+        }
+    }
+
+} rwbrkInterceptorPlanner;
+
 namespace py
 {
 void mypyPrintErr()
@@ -507,11 +542,12 @@ PyObject *pcsx2ModuleBuilder(void)
         static PyObject *AddBrk(PyObject *self, PyObject *args)
         {
             uint pc = 0;
-            PyObject *pyCb = NULL;
-            if (!PyArg_ParseTuple(args, "IO:pcsx2_AddBrk", &pc, &pyCb))
+            PyObject *callable = NULL;
+            uint flags = 0;
+            if (!PyArg_ParseTuple(args, "IO|I:pcsx2_AddBrk", &pc, &callable, &flags))
                 return NULL;
 
-            int token = brk::add(pc, pyCb);
+            int token = brk::add(pc, callable, flags);
 
             exitstatus::s_newbp = true;
             return PyLong_FromLong(token);
@@ -530,12 +566,16 @@ PyObject *pcsx2ModuleBuilder(void)
 
         static PyObject *AddRBrk(PyObject *self, PyObject *args)
         {
-            uint pc = 0, len = 0;
+            uint pc = 0;
+            uint len = 0;
             PyObject *callable = NULL;
-            if (!PyArg_ParseTuple(args, "IIO:pcsx2_AddRBrk", &pc, &len, &callable))
+            uint flags = 0;
+            if (!PyArg_ParseTuple(args, "IIO|I:pcsx2_AddRBrk", &pc, &len, &callable, &flags))
                 return NULL;
 
-            int token = rbrk::add(pc, len, callable);
+            int token = rbrk::add(pc, len, callable, flags);
+
+            rwbrkInterceptorPlanner.update();
 
             exitstatus::s_newbp = true;
             return PyLong_FromLongLong(token);
@@ -549,17 +589,23 @@ PyObject *pcsx2ModuleBuilder(void)
 
             rbrk::remove(token);
 
+            rwbrkInterceptorPlanner.update();
+
             Py_RETURN_NONE;
         }
 
         static PyObject *AddWBrk(PyObject *self, PyObject *args)
         {
-            uint pc = 0, len = 0;
+            uint pc = 0;
+            uint len = 0;
+            uint flags = 0;
             PyObject *callable = NULL;
-            if (!PyArg_ParseTuple(args, "IIO:pcsx2_AddWBrk", &pc, &len, &callable))
+            if (!PyArg_ParseTuple(args, "IIO|I:pcsx2_AddWBrk", &pc, &len, &callable, &flags))
                 return NULL;
 
-            int token = wbrk::add(pc, len, callable);
+            int token = wbrk::add(pc, len, callable, flags);
+
+            rwbrkInterceptorPlanner.update();
 
             exitstatus::s_newbp = true;
             return PyLong_FromLong(token);
@@ -572,6 +618,8 @@ PyObject *pcsx2ModuleBuilder(void)
                 return NULL;
 
             wbrk::remove(token);
+
+            rwbrkInterceptorPlanner.update();
 
             Py_RETURN_NONE;
         }
@@ -802,7 +850,7 @@ PyObject *pcsx2ModuleBuilder(void)
 
         static PyObject *pc(PyObject *self)
         {
-            return PyLong_FromLong(cpuRegs.pc);
+            return PyLong_FromLong(currentPc);
         }
 
         static PyObject *opc(PyObject *self)
@@ -963,7 +1011,13 @@ PyObject *pcsx2ModuleBuilder(void)
         -1,
         pcsx2_methods, NULL, NULL, NULL, NULL};
 
-    return PyModule_Create(&pcsx2module);
+    PyObject *pyPcsx2Module = PyModule_Create(&pcsx2module);
+
+    if (pyPcsx2Module != NULL) {
+        PyModule_AddIntConstant(pyPcsx2Module, "brkfReadOnly", (long)brkfReadOnly);
+    }
+
+    return pyPcsx2Module;
 }
 
 void finalize()
@@ -1145,9 +1199,21 @@ void __cdecl invokeCpuReset()
 
 int makeInterceptorPlan(u32 pc)
 {
-    return ((brk::items.find(pc) == brk::items.end()) ? 0 : execInterceptor) |
-           (rbrk::items.empty() ? 0 : loadOpInterceptor) |
-           (wbrk::items.empty() ? 0 : storeOpInterceptor);
+    u32 orFlags = 0 | rwbrkInterceptorPlanner.orFlags;
+    u32 andMask = readOnlyDeclaration & rwbrkInterceptorPlanner.andMask;
+
+    brk::Items::iterator iter = brk::items.lower_bound(pc);
+    brk::Items::iterator iterEnd = brk::items.upper_bound(pc);
+
+    for (; iter != iterEnd; iter++) {
+        orFlags |= execInterceptor;
+
+        if (!(iter->second.brkf & brkfReadOnly)) {
+            andMask &= ~(readOnlyDeclaration);
+        }
+    }
+
+    return orFlags | andMask;
 }
 
 } // namespace execmon

@@ -21,6 +21,10 @@ enum RecompilerInterceptorPlanner {
     readOnlyDeclaration = 8,
 };
 
+enum brkfEnum {
+    brkfReadOnly = 1,
+};
+
 namespace exitstatus
 {
 extern bool s_newbp;
@@ -60,11 +64,12 @@ namespace brk
 struct Item
 {
     int key;
+    u32 brkf;
     utils::UniquePyObject callable;
 };
 typedef std::multimap<u32, Item> Items;
 extern Items items;
-int add(u32 pc, PyObject *callable);
+int add(u32 pc, PyObject *callable, u32 flags);
 bool remove(int key);
 void __cdecl invoke();
 } // namespace brk
@@ -76,6 +81,7 @@ struct Item
     int key;
     u32 addr;
     u32 size;
+    u32 brkf;
     utils::UniquePyObject callable;
 
     inline bool ifHit(u32 target)
@@ -90,7 +96,7 @@ namespace rbrk
 typedef brkCommon::Item Item;
 typedef brkCommon::Items Items;
 extern brkCommon::Items items;
-int add(u32 addr, u32 size, PyObject *callable);
+int add(u32 addr, u32 size, PyObject *callable, u32 flags);
 bool remove(int key);
 void __cdecl invoke();
 } // namespace rbrk
@@ -99,7 +105,7 @@ namespace wbrk
 typedef brkCommon::Item Item;
 typedef brkCommon::Items Items;
 extern brkCommon::Items items;
-int add(u32 addr, u32 size, PyObject *callable);
+int add(u32 addr, u32 size, PyObject *callable, u32 flags);
 bool remove(int key);
 void __cdecl invoke();
 } // namespace wbrk
