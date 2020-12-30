@@ -56,20 +56,20 @@ Write line to pcsx2 debug window.
 ### pcsx2.AddBrk
 
 ```py
-cookie = pcsx2.AddBrk(addr, callable)
+cookie = pcsx2.AddBrk(addr, callable, brkf=0)
 ```
 
 ```py
-def bp(addr):
-	def setbp(funct):
-		print('Add bp: {0:x}'.format(addr))
-		pcsx2.AddBrk(addr, funct)
-	return setbp
+def bp(addr, brkf=pcsx2.brkfReadOnly):
+  def setbp(funct):
+    print('Add bp: {0:x}'.format(addr))
+      pcsx2.AddBrk(addr, funct, brkf)
+  return setbp
 
 @bp(0x002fdfc8)
 def S_ASSERT():
-	print("ASSERT!")
-	print(read0Str(pcsx2.GetUL0('a0')))
+  print("ASSERT!")
+  print(read0Str(pcsx2.GetUL0('a0')))
 ```
 
 ### pcsx2.DelBrk
@@ -202,7 +202,7 @@ Write a byte to EE memory.
 ### pcsx2.AddRBrk
 
 ```py
-cookie = pcsx2.AddRBrk(addr, length, callable)
+cookie = pcsx2.AddRBrk(addr, length, callable, brkf=0)
 
 callable(hitAddr)
 ```
@@ -218,7 +218,7 @@ pcsx2.DelRBrk(cookie)
 ### pcsx2.AddWBrk
 
 ```py
-cookie = pcsx2.AddWBrk(addr, length, callable)
+cookie = pcsx2.AddWBrk(addr, length, callable, brkf=0)
 
 callable(hitAddr)
 ```
@@ -279,8 +279,8 @@ OnSuspend is holded only last one.
 ```py
 @pcsx2.OnSuspend
 def onSuspend():
-	dump()
-	print('Suspend')
+  dump()
+  print('Suspend')
 ```
 
 ### pcsx2.OnResume
@@ -290,7 +290,7 @@ OnResume is holded only last one.
 ```py
 @pcsx2.OnResume
 def onResume():
-	print('Resume')
+  print('Resume')
 ```
 
 ### pcsx2.StartEETrace and pcsx2.EndEETrace
